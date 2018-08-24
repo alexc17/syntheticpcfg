@@ -5,6 +5,7 @@ import argparse
 
 import pcfgfactory
 import pcfg
+import utility
 
 parser = argparse.ArgumentParser(description='Sample from a given PCFG')
 
@@ -20,5 +21,17 @@ parser.add_argument("--seed",help="Choose random seed",type=int)
 
 
 args = parser.parse_args()
+
+mypcfg = pcfg.load_pcfg_from_file(args.inputfilename)
+
+mysampler = pcfg.Sampler(mypcfg)
+
+with open(args.outputfilename,'w') as outf:
+	for i in range(args.n):	
+		tree = mysampler.sample_tree()
+		# defatul is string.
+		s = utility.collect_yield(tree)
+		outf.write(" ".join(s) + "\n")
+
 
 
