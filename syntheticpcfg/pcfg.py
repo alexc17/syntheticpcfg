@@ -7,9 +7,7 @@ import numpy as np
 import numpy.linalg
 import numpy.random
 from collections import defaultdict
-## A PCFG in CNF ish
-## S can appear on rhs of productions.
-## May not be normalised or consistent.
+
 
 from utility import *
 import inside
@@ -19,7 +17,9 @@ RIGHT_ARROW = "->"
 START_SYMBOL = "S"
 
 class PCFG:
-
+	"""
+	This class stores a PCFG where the underlying CFG is in CNF (more or less).
+	"""
 	def __init__(self, cfg=None):
 		if cfg:
 			self.nonterminals = set(cfg.nonterminals)
