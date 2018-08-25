@@ -16,6 +16,7 @@ parser.add_argument("--lexicalproductions", help="Number of lexical productions"
 
 parser.add_argument("--seed",help="Choose random seed",type=int)
 
+parser.add_argument("--pitmanyor",help="Use Pitman Yor process for lexical probs",action=store_true)
 
 args = parser.parse_args()
 
@@ -29,6 +30,19 @@ factory = pcfgfactory.PCFGFactory()
 
 ## Configure factory
 
+factory.cfgfactory.number_nonterminals = args.nonterminals
+factory.cfgfactory.number_terminals = args.terminals
+factory.cfgfactory.binary_rules = args.binaryproductions
+factory.cfgfactory.number_nonterminals = args.lexicalproductions
+
+
+if args.pitmanyor:
+	factory.lexical_distribution = pcfgfactory.LexicalPitmanYor()
+
+
+
+
+# sample and save
 pcfg = factory.sample()
 
 pcfg.store(args.outputfilename)
