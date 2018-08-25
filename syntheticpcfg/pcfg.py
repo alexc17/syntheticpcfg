@@ -15,6 +15,8 @@ import inside
 
 RIGHT_ARROW = "->"
 START_SYMBOL = "S"
+UNARY_SYMBOL = "<A>"
+
 SAMPLE_MAX_DEPTH=100
 SAMPLE_CACHE_SIZE=1000
 PARTITION_FUNCTION_MAX_ITERATIONS=100
@@ -38,7 +40,35 @@ class PCFG:
 			self.productions = []
 		self.parameters = {}
 		self.log_parameters = {}
+	
+
+	def make_unary(self):
+		""" 
+		return a new grammar which has the same distribution over lengths and only one terminal symbol.
+		"""
+		upcfg = PCFG()
+		upcfg.terminals.add(UNARY_SYMBOL)
+		upcfg.nonterminals = set(self.nonterminals)
+		upcfg.start = self.start
 		
+		for prod in self.productions:
+			p = self.parameters[prod]
+			if len(prod) == 3:
+				# binary
+				upcfg.productions.append(prod)
+				upcfg.parameters[prod] = p
+			else:
+				# lexical
+				nt,a = prod
+				newprod = (nt,UNARY_SYMBOL)
+				if newprod in upcfg.parameters:
+					upcfg.parameters[newprod] += p 
+				else:
+					upcfg.productions.append(newprod)
+					upcfg.parameters[newprod] = p
+		upcfg.normalise()
+		return upcfg
+
 	def store(self, filename):
 		"""
 		Store this to a file.

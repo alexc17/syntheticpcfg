@@ -4,6 +4,7 @@
 import argparse
 import numpy.random
 from numpy.random import RandomState
+import math
 
 import pcfgfactory
 import pcfg
@@ -23,7 +24,12 @@ args = parser.parse_args()
 mypcfg = pcfg.load_pcfg_from_file(args.inputfilename)
 upcfg = mypcfg.make_unary()
 insider = inside.InsideComputation(upcfg)
+res = 1.0
 for length in range(1,args.maxlength + 1):
 	s = (pcfg.UNARY_SYMBOL,) * length
-	print(length,s)
+	lp = insider.inside_log_probability(s)
+	print(length,lp,math.exp(lp))
+	res -= math.exp(lp)
+print(">" + str(args.maxlength),math.log(res),res)
+
 
