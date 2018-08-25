@@ -13,7 +13,11 @@ def _append_yield(tree, prefix):
 		prefix = _append_yield(tree[2], prefix)
 	return prefix
 		
-
+def tree_to_string(tree):
+	if len(tree) == 2:
+		return "(" + tree[0] + " " + tree[1] + ")"
+	else:
+		return "(" + tree[0] + " " + tree_to_string(tree[1]) + " " +tree_to_string(tree[2]) +  ")"
 
 def generateRandomString(n):
 	"""generate a random string of lower case letters of length n"""

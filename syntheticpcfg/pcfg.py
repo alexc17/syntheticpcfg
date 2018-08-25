@@ -15,6 +15,10 @@ import inside
 
 RIGHT_ARROW = "->"
 START_SYMBOL = "S"
+SAMPLE_MAX_DEPTH=100
+SAMPLE_CACHE_SIZE=1000
+PARTITION_FUNCTION_MAX_ITERATIONS=100
+PARTITION_FUNCTION_EPSILON=1e-9
 
 class PCFG:
 	"""
@@ -207,14 +211,12 @@ class PCFG:
 				J[i,k] += a * y[j]
 			return J
 
-		epsilon = 1e-9
-		max_iterations = 100
-		for i in range(max_iterations):
+		for i in range(PARTITION_FUNCTION_MAX_ITERATIONS):
 			#print(x)
 			y = f(x)
 			#print(y)
 			x1 =  x - np.dot(np.linalg.inv(J(x)),y)
-			if numpy.linalg.norm(x - x1, 1) < epsilon:
+			if numpy.linalg.norm(x - x1, 1) < PARTITION_FUNCTION_EPSILON:
 				return { nt : x[ntindex[nt]] for nt in self.nonterminals}
 			x = x1
 		raise ValueError("failed to converge")
@@ -234,7 +236,7 @@ class PCFG:
 			if len(prod) == 2:
 				lprodmap[prod[0]] += self.parameters[prod]
 		z = defaultdict(float)
-		for i in range(100):
+		for i in range(PARTITION_FUNCTION_MAX_ITERATIONS):
 			z = self._compute_one_step_partition(z, bprods,lprodmap)
 		return z
 
@@ -378,17 +380,18 @@ class Multinomial:
 	this represents a collection of productions with the same left hand side.
 	"""
 
-	def __init__(self, pcfg, nonterminal, cache_size=1000):
+	def __init__(self, pcfg, nonterminal, cache_size=SAMPLE_CACHE_SIZE,random=random):
 		self.cache_size = cache_size
 		self.productions = [ prod for prod in pcfg.productions if prod[0] == nonterminal ]
 		self.n = len(self.productions)
 		self.nonterminal = nonterminal
 		parameters = [ pcfg.parameters[prod] for prod in self.productions]
 		self.p = np.array(parameters)/np.sum(parameters)
+		self.rng = random
 		self._sample()
 
 	def _sample(self):
-		self.cache = numpy.random.choice(range(self.n), size = self.cache_size,p = self.p)
+		self.cache = self.rng.choice(range(self.n), self.cache_size,True,self.p)
 		self.cache_index = 0
 
 	def sample_production(self):
@@ -407,12 +410,14 @@ class Sampler:
 	"""
 	This object is used to sample from a PCFG.
 	"""
-	def __init__(self, pcfg,cache_size=1000,max_depth = 1000):
+	def __init__(self, pcfg,cache_size=SAMPLE_CACHE_SIZE,max_depth = SAMPLE_MAX_DEPTH,random=None):
 		## construct indices for sampling
-		self.multinomials = { nt: Multinomial(pcfg,nt, cache_size) for nt in pcfg.nonterminals}
+		if random == None:
+			random = numpy.random.RandomState()
+		self.multinomials = { nt: Multinomial(pcfg,nt, cache_size,random) for nt in pcfg.nonterminals}
 		self.start = pcfg.start
 		self.max_depth = max_depth
-
+		
 
 	def sample_production(self, lhs):
 		return self.multinomials[lhs].sample_production()
