@@ -19,6 +19,50 @@ def tree_to_string(tree):
 	else:
 		return "(" + tree[0] + " " + tree_to_string(tree[1]) + " " +tree_to_string(tree[2]) +  ")"
 
+
+
+def string_to_tree(tree):
+	return _string_to_tree(tree,0)[0]
+
+def _string_to_tree(s, index):
+	# starting at a ( or beginning of a token.
+	# returns index one after 
+	if s[index] == '(':
+		label,index = read_token(s,index+1)
+		left, index = _string_to_tree(s,index)
+		if s[index]== ')':
+			return (label,left), index+1
+		while s[index].isspace():
+			index += 1
+		right,index = _string_to_tree(s,index)
+		while s[index].isspace():
+			index += 1
+		assert s[index] == ')'
+		return (label,left,right),index+1
+	else:
+		return read_token(s,index)
+
+def read_token(s,index):
+	start = index
+	while s[index].isalnum():
+		index+=1
+	end = index
+	while s[index].isspace():
+		index += 1
+	return s[start:end], index
+	
+
+
+
+def count_productions(tree, counter):
+	if len(tree) == 2:
+		counter[tree] += 1
+	else:
+		father,left,right = tree
+		counter[(father,left[0],right[0])] += 1
+		count_productions(left,counter)
+		count_productions(right,counter)
+
 def generateRandomString(n):
 	"""generate a random string of lower case letters of length n"""
 	myString = ""

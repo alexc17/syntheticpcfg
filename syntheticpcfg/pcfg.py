@@ -7,7 +7,7 @@ import numpy as np
 import numpy.linalg
 import numpy.random
 from collections import defaultdict
-
+from collections import Counter
 
 from utility import *
 import inside
@@ -354,6 +354,35 @@ class PCFG:
 		for nt in lprodmap:
 			newz[nt] += lprodmap[nt]
 		return newz
+
+
+def estimate_pcfg_from_treebank(filename):
+	"""
+	Take ML estimate from a treebank and retuen the pcfg that results.
+	"""
+	counts = Counter()
+	ml = PCFG()
+	with open(filename) as inf:
+		for line in inf:
+			
+			tokens = line.split()
+			i = 0
+			# skip some floats
+			while tokens[i].startswith('-') or tokens[i].startswith('0'):
+				i += 1
+
+			tree = string_to_tree(" ".join(tokens[i:]))
+			ml.start = tree[0]
+			count_productions(tree,counts)
+	
+	for production in counts:
+		ml.productions.append(production)
+		ml.nonterminals.add(production[0])
+		if len(production) == 2:
+			ml.terminals.add(production[1])
+		ml.parameters[production] = float(counts[production])
+	ml.normalise()
+	return ml
 
 def load_pcfg_from_file(filename, normalise=True, discard_zero=True):
 	nonterminals = set()

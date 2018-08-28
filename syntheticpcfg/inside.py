@@ -194,6 +194,8 @@ class InsideComputation:
 	def add_posteriors(self, sentence, posteriors, weight=1.0):
 		l = len(sentence)
 		table, table2 = self._compute_inside_table(sentence)
+		if not (0, self.start,l) in table:
+			raise ValueError("Can't parse," , sentence)
 		total_lp = table[(0, self.start,l)]
 		otable = self._compute_outside_table(sentence, table, table2)
 		

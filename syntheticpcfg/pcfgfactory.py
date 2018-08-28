@@ -163,7 +163,13 @@ class PCFGFactory:
 
 		#return unary_pcfg
 		for i in range(LENGTH_EM_ITERATIONS):
-			unary_pcfg = self.train_unary_once(unary_pcfg, unary, LENGTH_EM_MAX_LENGTH)
+			try:
+				unary_pcfg = self.train_unary_once(unary_pcfg, unary, LENGTH_EM_MAX_LENGTH)
+			except ValueError as e:
+				print("error training lengths")
+				print(unary_pcfg.productions)
+				raise e
+			
 
 		final_pcfg = pcfg.PCFG()
 		#print("nonterminals", unary_pcfg.nonterminals)

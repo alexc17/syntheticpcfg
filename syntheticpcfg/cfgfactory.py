@@ -27,6 +27,7 @@ class CFGFactory:
 		If empty, raise an exception.
 		"""
 		my_cfg = self.sample_raw()
+		print(self.number_nonterminals,self.number_terminals,self.binary_rules,self.lexical_rules)
 		ts = my_cfg.compute_trim_set()
 		if len(ts) == 0:
 			# empty language
