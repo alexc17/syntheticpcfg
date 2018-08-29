@@ -27,8 +27,10 @@ args = parser.parse_args()
 nts = args.nonterminals
 
 if args.binaryproductions >  0.5 * nts * nts * nts:
-	raise ValueError("Impossibly high number of binary rules.")
+	raise ValueError("High number of binary rules.")
 
+if args.binaryproductions < nts:
+	raise ValueError("Low number of binary rules.")
 
 factory = pcfgfactory.PCFGFactory()
 

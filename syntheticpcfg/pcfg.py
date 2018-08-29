@@ -501,4 +501,19 @@ class Sampler:
 			return (nonterminal, left_branch,right_branch)
 
 
+def estimate_ambiguity(mypcfg, samples = 1000):
+	"""
+	Monte Carlo estimate of the conditional entropy H(tree|string)
+	"""
+	mysampler = Sampler(mypcfg)
+	insider = inside.InsideComputation(mypcfg)
+	total = 0.0
+	for i in range(samples):
+		tree = mysampler.sample_tree()
+		s = collect_yield(tree)
+		lp = insider.inside_log_probability(s)
+		lpd = mypcfg.log_probability_derivation(tree)
+		#print(len(s),lp,lpd)
+		total += lp - lpd
+	return total/samples
 
