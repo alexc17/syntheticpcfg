@@ -7,6 +7,8 @@ import random
 
 import cfg 
 from utility import collect_yield
+import inside
+
 
 class UniformSampler:
 	"""
@@ -26,7 +28,7 @@ class UniformSampler:
 		
 		
 		self.prodindex = collections.defaultdict(list)
-		for prod in self.productions:
+		for prod in grammar.productions:
 			self.prodindex[prod[0]].append(prod)
 		
 		for nt in grammar.nonterminals:
@@ -36,7 +38,7 @@ class UniformSampler:
 			if len(prod) == 2:
 				self.index[prod][1] = 1
 				self.index[prod[0]][1] += 1
-		for i in range(2,self.L):
+		for length in range(2,self.L):
 			for prod in self.productions:
 				lhs,a,b = prod
 				increment = 0
@@ -70,7 +72,7 @@ class UniformSampler:
 
 		strings = 1.0 * self.vocab ** length
 		total = 0.0
-		parser = FIXME
+		parser = inside.InsideComputation(self.grammar)
 		inverse = 0.0
 		for i in range(samples):
 
@@ -79,28 +81,14 @@ class UniformSampler:
 			#print w
 			#print w
 			
-			n = parser.count(w)
+			n = parser.count_parses(w)
 			#print n
 			if n == 0:
-				tree.dump()
-				print "Bad number of parses", n
-				raise ValueError(w)
-			if n < 0:
-				print "infinite number of trees for ", w
-				self.grammar.dump()
-				raise ValueError(w)
+				raise ValueError("Generated a string which cannot be parsed.")
 			total += n
 			inverse += 1.0/n
-		# mean derivations per string.
-		mean = total / samples
-		# Imean is thus 1/ the avergae number of derivations per string.
 		imean = inverse /samples
-		print "Alternative estimate of strings ", imean * derivations/strings, (derivations / strings) /  mean
-		if mean <= 0.0:
-			raise ValueError(mean)
-	 	# the mean number of derivations per string.
-	 	print "length ", length, "derivations ", derivations, "mean ", mean, " possible strings ", strings, "imean", imean
-		return (derivations / strings) *  imean, derivations, strings, 1.0/imean
+		return (derivations / strings) *  imean #, derivations, strings, 1.0/imean
 
 
 	def get_total(self,length):
@@ -114,35 +102,24 @@ class UniformSampler:
 		return -1
 
 	def get_shortest_yields(self):
-		shortest_yield = {}}
+		shortest_yield = {}
 		for nt in self.nonterminals:
 			l = self.get_shortest_length(nonterminal)
 			if l == -1:
 				raise ValueError("No short yields")
 			else:
-				shortest_yield[nt] = self.sample_from_nonterminal(nonterminal,l).collectYield()
+				shortest_yield[nt] = self.sample_from_nonterminal(nonterminal,l)
 		return shortest_yield
 
-	def get_a_shortest_yield(self,nonterminal):
-		self._set_shortest_yields()
-		return self.shortest_yield[nonterminal]
-
-	def get(self, nonterminal, length):
-		"""
-		return how many derivations there are from this nonterminal  
-		that generate a given length.
-		"""
-		return self.index[nonterminal][length]	
 	
-
-
+	
 
 	def sample(self, length):
 		"""
 		Sample a tree that generates a string of this length,
 		uniformly from all trees that generate a string of this length.
 		"""
-		# pick a start symbol.
+		
 		if self.index[self.grammar.start][length] == 0.0:
 			raise ValueError("Sampling from empty")
 		return self.sample_from_nonterminal(self.grammar.start,length)
@@ -178,7 +155,7 @@ class UniformSampler:
 		#print "sample prod", production, " length ", length
 		if len(production) == 2:
 			assert(length == 1)
-			return production[1]
+			return production
 
 		lhs,one,two = production
 

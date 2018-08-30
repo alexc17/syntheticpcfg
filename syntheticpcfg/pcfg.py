@@ -175,6 +175,22 @@ class PCFG:
 			labeled_tree_entropy -= lp3
 		return string_entropy/n, unlabeled_tree_entropy/n, labeled_tree_entropy/n
 
+
+	def estimate_ambiguity(self, samples = 1000):
+		"""
+		Monte Carlo estimate of the conditional entropy H(tree|string)
+		"""
+		mysampler = Sampler(self)
+		insider = inside.InsideComputation(self)
+		total = 0.0
+		for i in range(samples):
+			tree = mysampler.sample_tree()
+			s = collect_yield(tree)
+			lp = insider.inside_log_probability(s)
+			lpd = self.log_probability_derivation(tree)
+			total += lp - lpd
+		return total/samples
+		
 	def partition_nonterminals(self):
 		"""
 		Partition the sets of nonterminals into sets of mutually recursive nonterminals.
@@ -501,19 +517,4 @@ class Sampler:
 			return (nonterminal, left_branch,right_branch)
 
 
-def estimate_ambiguity(mypcfg, samples = 1000):
-	"""
-	Monte Carlo estimate of the conditional entropy H(tree|string)
-	"""
-	mysampler = Sampler(mypcfg)
-	insider = inside.InsideComputation(mypcfg)
-	total = 0.0
-	for i in range(samples):
-		tree = mysampler.sample_tree()
-		s = collect_yield(tree)
-		lp = insider.inside_log_probability(s)
-		lpd = mypcfg.log_probability_derivation(tree)
-		#print(len(s),lp,lpd)
-		total += lp - lpd
-	return total/samples
 
