@@ -2,6 +2,10 @@
 import random
 import math
 
+
+class ParseFailureException(Exception):
+    pass
+
 def collect_yield(tree):
 	return _append_yield(tree, [])
 

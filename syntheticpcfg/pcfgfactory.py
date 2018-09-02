@@ -4,6 +4,7 @@ from collections import defaultdict
 import numpy.random
 import numpy as np
 import scipy.misc
+from scipy.stats import poisson
 
 import inside
 import cfg
@@ -44,7 +45,13 @@ class LengthDistribution:
 		"""
 		Sampled from a poisson
 		"""
-		pass
+		probs = [0.0] 
+		for k in range(1,max_length+1):
+			probability = poisson(k,alpha)
+			probs.append(probability)
+		self.weights = probs
+
+
 	def max_length(self):
 		return len(scores)
 

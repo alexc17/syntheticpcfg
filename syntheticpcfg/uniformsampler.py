@@ -2,6 +2,7 @@
 
 import collections
 import numpy as np
+import numpy.random
 import random
 
 
@@ -61,6 +62,15 @@ class UniformSampler:
 		strings = self.vocab ** length
 		return derivations/strings
 
+	def string_density_crude(self,length, samples):
+		terminals = list(self.grammar.terminals)
+		n = 0
+		parser = inside.InsideComputation(self.grammar)
+		for i in range(samples):
+			s = tuple([ numpy.random.choice(terminals) for x in range(length) ])
+			if parser.count_parses(s) > 0:
+				n += 1
+		return n/float(samples)
 
 	def string_density(self,length, samples):
 		"""

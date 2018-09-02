@@ -3,6 +3,8 @@ import collections
 import numpy as np
 import math
 
+from utility import *
+
 class InsideComputation:
 
 	def __init__(self, pcfg):
@@ -225,6 +227,8 @@ class InsideComputation:
 			if end == start + 1:
 				return (lhs, sentence[start])
 			else:
+				if not (start,lhs,end) in table:
+					raise ParseFailureException()
 				score, middle, prod = table[(start,lhs,end)]
 				lhs,rhs1,rhs2 = prod
 				left_subtree = extract_tree(start,rhs1,middle)
@@ -234,6 +238,9 @@ class InsideComputation:
 
 	def count_parses(self,sentence):
 		table, table2 = self._compute_inside_table(sentence,mode=2)
-		return table[(0,self.start,len(sentence))]
+		item = (0,self.start,len(sentence))
+		if not item in table:
+			return 0
+		return table[item]
 
 
