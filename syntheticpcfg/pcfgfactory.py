@@ -5,6 +5,7 @@ import numpy.random
 import numpy as np
 import scipy.misc
 from scipy.stats import poisson
+import logging
 
 import inside
 import cfg
@@ -114,7 +115,7 @@ class PCFGFactory:
 
 	def train_unary_once(self, my_pcfg, a, max_length):
 		posteriors = defaultdict(float)
-		max_length = min(max_length, len(self.length_weights)-1)
+		max_length = min(max_length, len(self.length_distribution.weights)-1)
 
 		insidec = inside.InsideComputation(my_pcfg)
 		for l in range(1 , max_length+1):
