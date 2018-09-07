@@ -24,6 +24,11 @@ def tree_to_string(tree):
 		return "(" + tree[0] + " " + tree_to_string(tree[1]) + " " +tree_to_string(tree[2]) +  ")"
 
 
+def tree_depth(tree):
+	if len(tree) == 2:
+		return 1
+	else:
+		return 1+max(tree_depth(tree[1]), tree_depth(tree[2]))
 
 def string_to_tree(tree):
 	return _string_to_tree(tree,0)[0]
@@ -69,42 +74,47 @@ def count_productions(tree, counter):
 
 def knuth_tree(tree):
     i = 0
-    layout = {}
+    
     def knuth_layout(tree, depth):
         nonlocal i
-        nonlocal layout
-        if len(tree) == 3:
-            knuth_layout(tree[1], depth+1)
-            layout[tree] = (i,depth)
-            i+= 1
-            knuth_layout(tree[2], depth+1)
-        else:
-            layout[tree] = (i,depth)
-            i += 1
-    knuth_layout(tree,0)
-    return layout
+        
 
-def plot_tree_with_layout(tree, layout):
+        if len(tree) == 3:
+            left = knuth_layout(tree[1], depth+1)
+            location = (i,depth)
+            i+= 1
+            right = knuth_layout(tree[2], depth+1)
+            return (location, tree[0], left, right)
+        else:
+            location = (i,depth)
+            i += 1
+            return (location, tree[0], tree[1])
+    return knuth_layout(tree,0)
+
+def plot_tree_with_layout(tree):
     
-    x,y = layout[tree]
-    label = tree[0]
+    x,y = tree[0]
+    label = tree[1]
     diff = len(label) *0.15
     plt.text(x-diff,-y,label)
-    if len(tree) == 3:
-        for subtree in tree[1:]:
-            x2,y2 = layout[subtree]
+    if len(tree) == 4:
+        for subtree in tree[2:]:
+            x2,y2 = subtree[0]
             plt.plot( [x,x2],[-y-0.1,-y2+0.4],'b')
-            plot_tree_with_layout(subtree,layout)
+            plot_tree_with_layout(subtree)
     else:
         plt.plot( [x,x],[-y-0.1,-y-0.5],'r' )
-        leaf = tree[1]
+        leaf = tree[2]
         diff = len(leaf) *0.15
-        plt.text(x-diff,-y-1.0,tree[1])
+        plt.text(x-diff,-y-1.0,leaf)
     
 def plot_tree(tree):
+	l = len(collect_yield(tree))
+	d = tree_depth(tree)
+	plt.figure(figsize=(l+1, d+1))
 	plt.axis('off')
 	layout = knuth_tree(tree)
-	plot_tree_with_layout(tree, layout)
+	plot_tree_with_layout(layout)
 	plt.show()
 
 def generateRandomString(n):
