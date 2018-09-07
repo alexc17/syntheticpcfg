@@ -87,15 +87,19 @@ def knuth_tree(tree):
 def plot_tree_with_layout(tree, layout):
     
     x,y = layout[tree]
-    plt.text(x,-y,tree[0])
+    label = tree[0]
+    diff = len(label) *0.15
+    plt.text(x-diff,-y,label)
     if len(tree) == 3:
         for subtree in tree[1:]:
             x2,y2 = layout[subtree]
-            plt.plot( [x,x2],[-y,-y2] )
+            plt.plot( [x,x2],[-y-0.1,-y2+0.4],'b')
             plot_tree_with_layout(subtree,layout)
     else:
-        plt.plot( [x,x],[-y,-y-0.5] )
-        plt.text(x,-y-0.5,tree[1])
+        plt.plot( [x,x],[-y-0.1,-y-0.5],'r' )
+        leaf = tree[1]
+        diff = len(leaf) *0.15
+        plt.text(x-diff,-y-1.0,tree[1])
     
 def plot_tree(tree):
 	plt.axis('off')
