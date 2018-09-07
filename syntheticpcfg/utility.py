@@ -1,7 +1,7 @@
 #utility.py
 import random
 import math
-
+import matplotlib.pyplot as plt
 
 class ParseFailureException(Exception):
     pass
@@ -66,6 +66,42 @@ def count_productions(tree, counter):
 		counter[(father,left[0],right[0])] += 1
 		count_productions(left,counter)
 		count_productions(right,counter)
+
+def knuth_tree(tree):
+    i = 0
+    layout = {}
+    def knuth_layout(tree, depth):
+        nonlocal i
+        nonlocal layout
+        if len(tree) == 3:
+            knuth_layout(tree[1], depth+1)
+            layout[tree] = (i,depth)
+            i+= 1
+            knuth_layout(tree[2], depth+1)
+        else:
+            layout[tree] = (i,depth)
+            i += 1
+    knuth_layout(tree,0)
+    return layout
+
+def plot_tree_with_layout(tree, layout):
+    
+    x,y = layout[tree]
+    plt.text(x,-y,tree[0])
+    if len(tree) == 3:
+        for subtree in tree[1:]:
+            x2,y2 = layout[subtree]
+            plt.plot( [x,x2],[-y,-y2] )
+            plot_tree_with_layout(subtree,layout)
+    else:
+        plt.plot( [x,x],[-y,-y-0.5] )
+        plt.text(x,-y-0.5,tree[1])
+    
+def plot_tree(tree):
+	plt.axis('off')
+	layout = knuth_tree(tree)
+	plot_tree_with_layout(tree, layout)
+	plt.show()
 
 def generateRandomString(n):
 	"""generate a random string of lower case letters of length n"""
