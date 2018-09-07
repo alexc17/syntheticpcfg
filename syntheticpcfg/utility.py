@@ -111,7 +111,7 @@ def plot_tree_with_layout(tree):
 def plot_tree(tree):
 	l = len(collect_yield(tree))
 	d = tree_depth(tree)
-	plt.figure(figsize=(l+1, d+1))
+	plt.figure(figsize=(l/2+1, d/2+1))
 	plt.axis('off')
 	layout = knuth_tree(tree)
 	plot_tree_with_layout(layout)
