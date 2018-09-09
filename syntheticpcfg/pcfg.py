@@ -106,7 +106,28 @@ class PCFG:
 					# binary rule so 
 					p = self.parameters[prod] / (1.0 - preterminal_probs[prod.lhs])
 					fhandle.write( "%0.12f %s --> %s %s \n" % ( p, prod[0], prod[1],prod[2]))
-			
+	
+	def copy(self):
+		"""
+		return a new copy of this pcfg.
+		"""
+		copypcfg = PCFG()
+		copypcfg.nonterminals = set(self.nonterminals)
+		copypcfg.terminals = set(self.terminals)
+		copypcfg.start = self.start
+		copypcfg.productions = list(self.productions)
+		copypcfg.parameters = dict(self.parameters)
+		copypcfg.log_parameters = dict(self.log_parameters)
+		return copypcfg
+
+	def trim_zeros(self):
+		"""
+		remove all zero productions, zero nonterminals and zero terminals.
+		"""
+		self.productions = [ prod for prod in self.productions if self.parameters[prod] > 0.0]
+		self.nonterminals = set( [ prod[0] for prod in self.productions])
+		self.terminals = set( [ prod[1] for prod in self.productions if len(prod) == 2])
+		self.parameters = { prod : self.parameters[prod] for prod in self.productions}
 
 	def normalise(self):
 		totals = defaultdict(float)

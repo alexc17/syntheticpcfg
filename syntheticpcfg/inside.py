@@ -197,7 +197,7 @@ class InsideComputation:
 		l = len(sentence)
 		table, table2 = self._compute_inside_table(sentence)
 		if not (0, self.start,l) in table:
-			raise ValueError("Can't parse," , sentence)
+			raise ParseFailureException("Can't parse," , sentence)
 		total_lp = table[(0, self.start,l)]
 		otable = self._compute_outside_table(sentence, table, table2)
 		
@@ -219,6 +219,7 @@ class InsideComputation:
 								rule_lp = self.log_parameters[prod]
 								posterior = math.exp(olp + ilp1 + ilp2 + rule_lp - total_lp)
 								posteriors[prod] += weight * posterior
+		return total_lp
 
 
 	def viterbi_parse(self,sentence):

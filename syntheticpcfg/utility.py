@@ -100,10 +100,10 @@ def plot_tree_with_layout(tree):
     if len(tree) == 4:
         for subtree in tree[2:]:
             x2,y2 = subtree[0]
-            plt.plot( [x,x2],[-y-0.1,-y2+0.4],'b')
+            plt.plot( [x,x2],[-y-0.2,-y2+0.4],'b')
             plot_tree_with_layout(subtree)
     else:
-        plt.plot( [x,x],[-y-0.1,-y-0.5],'r' )
+        plt.plot( [x,x],[-y-0.2,-y-0.6],'r' )
         leaf = tree[2]
         diff = len(leaf) *0.15
         plt.text(x-diff,-y-1.0,leaf)
