@@ -11,6 +11,7 @@ import inside
 import cfg
 import cfgfactory
 import pcfg
+import utility
 
 LENGTH_EM_ITERATIONS = 5
 LENGTH_EM_MAX_LENGTH = 20
@@ -152,9 +153,10 @@ class PCFGFactory:
 		result.renormalise()
 		return result
 
-	def sample(self):
+	def sample(self, ignore_errors=False):
 		"""
 		return a PCFG that is well behaved.
+		This may not generate strings of all lengths.
 		"""
 		cfg = self.cfgfactory.sample_trim()
 		## 
@@ -182,10 +184,13 @@ class PCFGFactory:
 		for i in range(LENGTH_EM_ITERATIONS):
 			try:
 				unary_pcfg = self.train_unary_once(unary_pcfg, unary, LENGTH_EM_MAX_LENGTH)
-			except ValueError as e:
-				print("error training lengths")
-				print(unary_pcfg.productions)
-				raise e
+			except utility.ParseFailureException as e:
+				logging.error("error training lengths with iteration %d", i)	
+				if ignore_errors:
+					logging.error("Continuing with the PCFG which may have a bad length distribution.")
+					break
+				else:
+					raise e
 			
 
 		final_pcfg = pcfg.PCFG()

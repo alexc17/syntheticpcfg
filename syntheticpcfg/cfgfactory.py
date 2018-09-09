@@ -2,7 +2,7 @@
 import utility
 import numpy.random
 import cfg
-
+import logging
 
 class CFGFactory:
 
@@ -27,7 +27,7 @@ class CFGFactory:
 		If empty, raise an exception.
 		"""
 		my_cfg = self.sample_raw()
-		print(self.number_nonterminals,self.number_terminals,self.binary_rules,self.lexical_rules)
+		logging.info("CFG nominally has %d nonterminals, %d terminals, %d binary_rules and %d lexical rules", self.number_nonterminals,self.number_terminals,self.binary_rules,self.lexical_rules)
 		ts = my_cfg.compute_trim_set()
 		if len(ts) == 0:
 			# empty language
@@ -43,6 +43,10 @@ class CFGFactory:
 		tcfg.terminals = terminals
 		tcfg.nonterminals = ts
 		tcfg.productions = set(prods)
+		logging.info("Final CFG has %d nonterminals, %d terminals, %d binary_rules and %d lexical rules",
+			len(tcfg.nonterminals), len(tcfg.terminals), 
+			len([prod in tcfg.productions if len(prod) == 3]),
+			len([prod in tcfg.productions if len(prod) == 2]))
 		return tcfg
 
 

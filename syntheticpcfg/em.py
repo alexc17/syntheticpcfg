@@ -6,7 +6,7 @@ import logging
 
 MAX_LENGTH = 20
 MAX_EM_ITERATIONS = 100
-EPSILON = 1e-6
+EPSILON = 1e-8
 
 class Trainer:
 	"""
@@ -41,6 +41,7 @@ class Trainer:
 				if abs(lp - lps[-1]) > EPSILON * len(self.training):
 					lps.append(lp)
 				else:
+					logging.info("Converged : lp difference is %f", abs(lp - lps[-1]))
 					return mypcfg,lps
 			else:
 				lps.append(lp)
@@ -49,6 +50,7 @@ class Trainer:
 		insider = inside.InsideComputation(mypcfg)
 		posteriors = defaultdict(float)
 		total_lp = 0.0
+		too_long = 0
 		for s in self.training:
 			if len(s) <= self.max_length:
 				try:
@@ -58,8 +60,10 @@ class Trainer:
 						logging.error("Parse failure on ", s)
 					else:
 						raise e
+			else:
+				too_long += 1
 
-
+		logging.info("Skipped %d sentences which were > %d long", too_long, self.max_length)
 				
 		mypcfg.parameters = posteriors
 		mypcfg.trim_zeros()
