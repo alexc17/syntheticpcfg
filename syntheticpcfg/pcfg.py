@@ -120,11 +120,11 @@ class PCFG:
 		copypcfg.log_parameters = dict(self.log_parameters)
 		return copypcfg
 
-	def trim_zeros(self):
+	def trim_zeros(self, threshold = 0.0):
 		"""
 		remove all zero productions, zero nonterminals and zero terminals.
 		"""
-		self.productions = [ prod for prod in self.productions if self.parameters[prod] > 0.0]
+		self.productions = [ prod for prod in self.productions if self.parameters[prod] > threshold]
 		self.nonterminals = set( [ prod[0] for prod in self.productions])
 		self.terminals = set( [ prod[1] for prod in self.productions if len(prod) == 2])
 		self.parameters = { prod : self.parameters[prod] for prod in self.productions}

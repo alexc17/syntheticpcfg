@@ -45,8 +45,8 @@ class CFGFactory:
 		tcfg.productions = set(prods)
 		logging.info("Final CFG has %d nonterminals, %d terminals, %d binary_rules and %d lexical rules",
 			len(tcfg.nonterminals), len(tcfg.terminals), 
-			len([prod in tcfg.productions if len(prod) == 3]),
-			len([prod in tcfg.productions if len(prod) == 2]))
+			len([prod for prod in tcfg.productions if len(prod) == 3]),
+			len([prod for prod in tcfg.productions if len(prod) == 2]))
 		return tcfg
 
 

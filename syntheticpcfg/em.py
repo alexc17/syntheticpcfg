@@ -45,6 +45,7 @@ class Trainer:
 					return mypcfg,lps
 			else:
 				lps.append(lp)
+		logging.warning("Failed to converge : lp difference is %f", abs(lp - lps[-1]))
 
 	def train_once(self, mypcfg, skip_errors = False):
 		insider = inside.InsideComputation(mypcfg)
