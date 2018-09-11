@@ -2,8 +2,126 @@
 import collections
 import numpy as np
 import math
+import logging
 
 from utility import *
+
+
+class UnaryInside:
+	"""
+	Class optimised for doing EM for unary alphabets. When we are training the binary parameters.
+
+	Don't work in log space. Assume that it is dense.
+
+	"""
+
+	def __init__(self, mypcfg):
+		self.mypcfg = mypcfg
+		assert(len(mypcfg.terminals)) == 1
+		self.a = list(mypcfg.terminals)[0]
+
+		self.ntindex = { nt : i for i,nt in enumerate(list(mypcfg.nonterminals)) }
+		self.start = self.ntindex[mypcfg.start]
+		self.nts = list(mypcfg.nonterminals)
+		self.nnts = len(self.nts)
+		self.lexical_probs = np.zeros(self.nnts)
+		for i,nt in enumerate(self.nts):
+			self.lexical_probs[i] = mypcfg.parameters[(nt,self.a)]
+		
+		self.prods = []
+		for prod in mypcfg.productions:
+			if len(prod) == 3:
+				p = mypcfg.parameters[prod]
+				a,b,c = prod
+				x,y,z = self.ntindex[a], self.ntindex[b], self.ntindex[c]
+				
+				self.prods.append((x,y,z,p,len(self.prods)))
+
+	def compute_inside(self, length):
+		table = np.zeros((length, length+1, self.nnts))
+		for i in range(length):
+			table[i,i+1,:] = self.lexical_probs
+		for width in range(2,length+1):
+			for start in range(0, length+1 -width):
+				end = start + width			
+				for middle in range(start+1, end):
+					for x,y,z,p,_ in self.prods:
+						table[start, end, x] += table[start,middle,y] * table[middle,end,z] * p
+		return table
+
+	def compute_outside(self, inside, length):
+		outside = np.zeros((length, length+1, self.nnts))
+		outside[0,length, self.start] = 1.0
+		for width in reversed(range(1,length)):
+			for start in range(0, length+1-width):
+				end = start+width
+				for leftpos in range(0,start):
+					for x,y,z,p,_ in self.prods:
+						outside[start,end,z] += outside[leftpos,end,x] * inside[leftpos,start,y] * p
+				for rightpos in range(end+1, length+1):
+					for x,y,z,p,_ in self.prods:
+						outside[start,end,y] += outside[start, rightpos,x] * inside[end,rightpos,z] * p
+		return outside
+
+	def add_to_posteriors(self, length, weight, lposteriors, bposteriors):
+		#print("Inside")
+		inside = self.compute_inside(length)
+		#print("Outside")
+
+		outside = self.compute_outside(inside, length)
+		#print("Posteriors")
+		tp = inside[0,length,self.start]
+		alpha = weight /tp 
+		for i in range(length):
+			# vectorise maybe ? but this isnt the limiting factor.
+			for nt in range(self.nnts):
+				lposteriors[nt] += alpha * inside[i,i+1,nt ] * outside[i,i+1,nt] 
+		#print("BPosteriors")
+		for width in range(2,length+1):
+			for start in range(0, length+1 -width):
+				end = start + width			
+				for middle in range(start+1, end):
+					for x,y,z,p,i in self.prods:
+						bposteriors[i] += alpha * p * inside[start,middle,y] * inside[middle,end,z] * outside[start,end,x]
+		return math.log(tp) * weight
+
+	def train_once(self, weights, max_length):
+		
+		lposteriors = np.zeros(self.nnts)
+		bposteriors = np.zeros(len(self.prods))
+		total_lp = 0.0
+		for length, weight in enumerate(weights[:max_length+1]):
+			#print(length,weight)
+			if weight > 0:
+				total_lp += self.add_to_posteriors(length, weight, lposteriors, bposteriors)
+		totals = np.zeros(self.nnts)
+		totals += lposteriors
+		for x,y,z,p,i in self.prods:
+			totals[x] += bposteriors[i]
+		# FIXME check for zeroes .
+		self.prods = [ (x,y,z, bposteriors[i]/totals[x],i) for x,y,z,p,i in self.prods ]
+		self.lexical_probs = lposteriors/totals
+		logging.info("Total LP %f", total_lp)
+		return total_lp
+
+	def get_params(self):
+		"""
+		return a dict with the currene parameter values.
+		"""
+		params = {}
+		for x,y,z,p,i in self.prods:
+			prod = (self.nts[x],self.nts[y],self.nts[z])
+			params[prod] = p
+		for i,nt in enumerate(self.nts):
+			prod = (nt, self.a)
+			params[prod] = self.lexical_probs[i]
+		return params
+
+
+
+
+
+
 
 class InsideComputation:
 
