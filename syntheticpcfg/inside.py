@@ -64,7 +64,7 @@ class UnaryInside:
 			for middle in range(1, width):
 				for x,y,z,p,_ in self.prods:
 					table[width, x] += table[middle,y] * table[width-middle,z] * p 
-					assert(table[width,x] < 1.0)
+					assert(table[width,x] <= 1.0)
 		return table
 
 	def add_to_posteriors_viterbi(self, length, weight, lposteriors, bposteriors):
@@ -73,14 +73,15 @@ class UnaryInside:
 		table[1,:] = self.lexical_probs
 		traceback = {}
 		for width in range(2,length+1):
-			for middle in range(1, width):
+			for left in range(1, width):
+				right = width - left
 				for x,y,z,p,i in self.prods:
 					ov = table[width, x]
-					nv = table[middle,y] * table[width-middle,z] * p
+					nv = table[left,y] * table[right,z] * p
 					if nv > ov:
 						#print("setting", width, x)
 						table[width, x] = nv
-						traceback[(width,x)] = (middle, width-middle, y,z,i)
+						traceback[(width,x)] = (left, right, y,z,i)
 		#print(table)
 		#print(traceback)
 		def add_counts(node):
@@ -94,9 +95,10 @@ class UnaryInside:
 				bposteriors[i] += weight
 				add_counts( (left,y))
 				add_counts((right,z))
+
 		add_counts((length,self.start))
 		return weight * math.log(table[length,self.start])
-		
+
 
 
 	def compute_outside(self, inside, length):
@@ -134,6 +136,45 @@ class UnaryInside:
 					for x,y,z,p,i in self.prods:
 						bposteriors[i] += alpha * p * inside[start,middle,y] * inside[middle,end,z] * outside[start,end,x]
 		return math.log(tp) * weight
+
+	def add_to_posteriors_smart(self, length, max_length, inside, outside, weight, lposteriors, bposteriors):
+		"""
+		we resuse the chart from the largest one, making adjustments as nceesary to the outside ones.
+		"""
+		tp = inside[0,length,self.start]
+		diff = max_length - length
+		alpha = weight /tp 
+		for i in range(length):
+			# vectorise maybe ? but this isnt the limiting factor.
+			for nt in range(self.nnts):
+				## outsides we want 
+
+				lposteriors[nt] += alpha * inside[i,i+1,nt ] * outside[i,diff + i+1,nt] 
+		#print("BPosteriors")
+		for width in range(2,length+1):
+			for start in range(0, length+1 -width):
+				end = start + width			
+				for middle in range(start+1, end):
+					for x,y,z,p,i in self.prods:
+						bposteriors[i] += alpha * p * inside[start,middle,y] * inside[middle,end,z] * outside[start,diff + end,x]
+		return math.log(tp) * weight
+
+	def train_once_smart(self, weights, max_length):
+		"""
+		Only compute the inside and outside charts once.
+		"""
+		inside = self.compute_inside(max_length)		
+		outside = self.compute_outside(inside, max_length)
+		lposteriors = np.zeros(self.nnts)
+		bposteriors = np.zeros(len(self.prods))
+
+		total_lp = 0.0
+		for length, weight in enumerate(weights[:max_length+1]):
+			#print(length,weight)
+			if weight > 0:
+				total_lp += self.add_to_posteriors_smart(length, max_length, inside, outside, weight, lposteriors, bposteriors)
+
+
 
 	def train_once(self, weights, max_length, viterbi=False):
 		
