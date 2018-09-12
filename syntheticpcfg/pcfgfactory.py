@@ -2,6 +2,7 @@
 from collections import Counter
 from collections import defaultdict
 import numpy.random
+import math
 import numpy as np
 import scipy.misc
 from scipy.stats import poisson
@@ -20,7 +21,8 @@ LENGTH_EM_MAX_LENGTH = 20
 class LengthDistribution:
 
 	def __init__(self):
-		self.weights = [0.0, 9.0, 10.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0]
+		# Do not use these default weights.
+		self.weights = [0.0, 1.0,1.0,1.0, 1.0, 1.0, 100.0, 100.0, 1.0, 1.0, 1.0]
 
 
 	def cds(self):
@@ -37,8 +39,24 @@ class LengthDistribution:
 		"""
 		self.weights = [0, 137, 282, 309, 434, 504, 630, 739, 929, 992, 1101, 1226, 1508, 1457, 1540, 1529, 1640, 1616, 1714, 1580, 1666, 1599, 1566, 1566, 1392, 1452, 1365, 1245, 1146, 1102, 1031, 881, 768, 696, 581, 548, 483, 441, 384, 352, 263]
 		#[0, 137, 282, 309, 434, 504, 630, 739, 929, 992, 1101, 1226, 1508, 1457, 1540, 1529, 1640, 1616, 1714, 1580, 1666, 1599, 1566, 1566, 1392, 1452, 1365, 1245, 1146, 1102, 1031, 881, 768, 696, 581, 548, 483, 441, 384, 352, 263, 252, 237, 184, 159, 121, 99, 89, 74, 58, 56, 62, 40, 27, 29, 27, 19, 28, 9, 14, 17, 13, 9, 8, 2, 1, 2, 2, 5, 6, 2, 1, 1, 6, 1, 3, 1, 3, 2, 0, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-		
- 
+
+	def ml_lp(self, max_length):
+		s = sum(self.weights[:max_length+1])
+		lp = 0.0
+		for w in self.weights[:max_length+1]:
+			if w > 0:
+				p = float(w)/s
+				lp += w * math.log(p)
+		return lp 
+
+	def ml_lp_general(self, max_length):
+		s = sum(self.weights)
+		lp = 0.0
+		for w in self.weights[:max_length+1]:
+			if w > 0:
+				p = float(w)/s
+				lp += w * math.log(p)
+		return lp 
 
 	def ztnb(self,r=5,p=0.5,max_length=20):
 		"""
@@ -62,7 +80,7 @@ class LengthDistribution:
 
 
 	def max_length(self):
-		return len(scores)
+		return len(self.weights)
 
 	def from_corpus(self, filename):
 		"""
@@ -126,15 +144,19 @@ class PCFGFactory:
 		max_length = min(max_length, len(self.length_distribution.weights)-1)
 
 		insidec = inside.InsideComputation(my_pcfg)
+		total = 0
 		for l in range(1 , max_length+1):
 			s = tuple([ a for i in range(l)])
 			w = self.length_distribution.weights[l]
+			#print(l,w)
 			if w > 0:
-				insidec.add_posteriors(s, posteriors, w)
+				lp = w * insidec.add_posteriors(s, posteriors, w)
+				total += lp
 			#print("Posteriors",l,posteriors)
+		logging.info("UNARY LP %f", total)
 		my_pcfg.parameters = posteriors
 		my_pcfg.normalise()
-		return my_pcfg
+		return my_pcfg,total
 
 	def sample_naive(self):
 		"""
@@ -160,7 +182,7 @@ class PCFGFactory:
 		result.renormalise()
 		return result
 
-	def sample(self, ignore_errors=False):
+	def sample(self, ignore_errors=False, viterbi=False):
 		"""
 		return a PCFG that is well behaved.
 		This may not generate strings of all lengths.
@@ -187,32 +209,49 @@ class PCFGFactory:
 
 		self.current = unary_pcfg
 
+
+		# compute best possible LP.
+		logging.info("Training with LENGTH_EM_MAX_LENGTH %d ", LENGTH_EM_MAX_LENGTH)
 		#return unary_pcfg
+		targetlp = self.length_distribution.ml_lp(LENGTH_EM_MAX_LENGTH)
+		valid_target = self.length_distribution.ml_lp_general(LENGTH_EM_MAX_LENGTH)
+		logging.info("Target LP = %f, %f", targetlp, valid_target)
+		ui = inside.UnaryInside(unary_pcfg)
 		for i in range(LENGTH_EM_ITERATIONS):
-			try:
-				unary_pcfg = self.train_unary_once(unary_pcfg, unary, LENGTH_EM_MAX_LENGTH)
-			except utility.ParseFailureException as e:
-				logging.error("error training lengths with iteration %d", i)	
-				if ignore_errors:
-					logging.error("Continuing with the PCFG which may have a bad length distribution.")
-					break
-				else:
-					raise e
+
+			logging.info("Starting EM iteration %d, target = %f", i,targetlp)
+			lp = ui.train_once(self.length_distribution.weights, LENGTH_EM_MAX_LENGTH, viterbi=viterbi)
 			
 
+			# try:
+			# 	unary_pcfg, lp = self.train_unary_once(unary_pcfg, unary, LENGTH_EM_MAX_LENGTH)
+			# 	self.current = unary_pcfg
+			# except utility.ParseFailureException as e:
+			# 	logging.error("error training lengths with iteration %d", i)	
+			# 	if ignore_errors:
+			# 		logging.error("Continuing with the PCFG which may have a bad length distribution.")
+			# 		break
+			# 	else:
+			# 		raise e
+			
+		
+		unary_pcfg.parameters = ui.get_params()
+		unary_pcfg.trim_zeros()
 		final_pcfg = pcfg.PCFG()
 		#print("nonterminals", unary_pcfg.nonterminals)
 		for nt in lexical_index:
-			totalp = unary_pcfg.parameters[(nt,unary)]
-			k = len(lexical_index[nt])
-			probs = self.lexical_distribution.sample(k)
-			#print(nt,probs,k,totalp,unary)
-			assert(len(probs) == k)
-			for a,p  in zip(lexical_index[nt],probs):
-				prod = (nt,a)
+			
+			if (nt,unary) in unary_pcfg.parameters:
+				totalp = unary_pcfg.parameters[(nt,unary)]
+				k = len(lexical_index[nt])
+				probs = self.lexical_distribution.sample(k)
+				#print(nt,probs,k,totalp,unary)
+				assert(len(probs) == k)
+				for a,p  in zip(lexical_index[nt],probs):
+					prod = (nt,a)
 
-				final_pcfg.productions.append(prod)
-				final_pcfg.parameters[prod] = p * totalp
+					final_pcfg.productions.append(prod)
+					final_pcfg.parameters[prod] = p * totalp
 		for prod in unary_pcfg.productions:
 			if len(prod) == 3:
 				final_pcfg.productions.append(prod)

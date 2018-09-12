@@ -122,7 +122,7 @@ class PCFG:
 
 	def trim_zeros(self, threshold = 0.0):
 		"""
-		remove all zero productions, zero nonterminals and zero terminals.
+		destructively remove all zero productions, zero nonterminals and zero terminals.
 		"""
 		self.productions = [ prod for prod in self.productions if self.parameters[prod] > threshold]
 		self.nonterminals = set( [ prod[0] for prod in self.productions])

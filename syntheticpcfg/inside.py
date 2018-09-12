@@ -13,6 +13,10 @@ class UnaryInside:
 
 	Don't work in log space. Assume that it is dense.
 
+	There is repretitive structure in the inside  tables.
+	i.e. all of the inside probs of the same width are the same.
+	
+
 	"""
 
 	def __init__(self, mypcfg):
@@ -26,7 +30,8 @@ class UnaryInside:
 		self.nnts = len(self.nts)
 		self.lexical_probs = np.zeros(self.nnts)
 		for i,nt in enumerate(self.nts):
-			self.lexical_probs[i] = mypcfg.parameters[(nt,self.a)]
+			if (nt,self.a) in mypcfg.parameters:
+				self.lexical_probs[i] = mypcfg.parameters[(nt,self.a)]
 		
 		self.prods = []
 		for prod in mypcfg.productions:
@@ -48,6 +53,51 @@ class UnaryInside:
 					for x,y,z,p,_ in self.prods:
 						table[start, end, x] += table[start,middle,y] * table[middle,end,z] * p
 		return table
+
+	def compute_inside_smart(self, length):
+		# width 
+		table = np.zeros((length+1, self.nnts))
+		
+		table[1,:] = self.lexical_probs
+
+		for width in range(2,length+1):
+			for middle in range(1, width):
+				for x,y,z,p,_ in self.prods:
+					table[width, x] += table[middle,y] * table[width-middle,z] * p 
+					assert(table[width,x] < 1.0)
+		return table
+
+	def add_to_posteriors_viterbi(self, length, weight, lposteriors, bposteriors):
+		table = np.zeros((length+1, self.nnts))
+		#print("Length",length)
+		table[1,:] = self.lexical_probs
+		traceback = {}
+		for width in range(2,length+1):
+			for middle in range(1, width):
+				for x,y,z,p,i in self.prods:
+					ov = table[width, x]
+					nv = table[middle,y] * table[width-middle,z] * p
+					if nv > ov:
+						#print("setting", width, x)
+						table[width, x] = nv
+						traceback[(width,x)] = (middle, width-middle, y,z,i)
+		#print(table)
+		#print(traceback)
+		def add_counts(node):
+			#print("Add counts from ", node)
+			width, nt = node
+			if width == 1:
+				# its a leaf
+				lposteriors[nt] += weight
+			else:
+				left, right, y,z,i = traceback[node]
+				bposteriors[i] += weight
+				add_counts( (left,y))
+				add_counts((right,z))
+		add_counts((length,self.start))
+		return weight * math.log(table[length,self.start])
+		
+
 
 	def compute_outside(self, inside, length):
 		outside = np.zeros((length, length+1, self.nnts))
@@ -85,7 +135,7 @@ class UnaryInside:
 						bposteriors[i] += alpha * p * inside[start,middle,y] * inside[middle,end,z] * outside[start,end,x]
 		return math.log(tp) * weight
 
-	def train_once(self, weights, max_length):
+	def train_once(self, weights, max_length, viterbi=False):
 		
 		lposteriors = np.zeros(self.nnts)
 		bposteriors = np.zeros(len(self.prods))
@@ -93,17 +143,32 @@ class UnaryInside:
 		for length, weight in enumerate(weights[:max_length+1]):
 			#print(length,weight)
 			if weight > 0:
-				total_lp += self.add_to_posteriors(length, weight, lposteriors, bposteriors)
+				if viterbi:
+					total_lp += self.add_to_posteriors_viterbi(length, weight, lposteriors, bposteriors)
+				else:
+					total_lp += self.add_to_posteriors(length, weight, lposteriors, bposteriors)
 		totals = np.zeros(self.nnts)
 		totals += lposteriors
 		for x,y,z,p,i in self.prods:
 			totals[x] += bposteriors[i]
 		# FIXME check for zeroes .
-		self.prods = [ (x,y,z, bposteriors[i]/totals[x],i) for x,y,z,p,i in self.prods ]
-		self.lexical_probs = lposteriors/totals
-		logging.info("Total LP %f", total_lp)
-		return total_lp
+		for i,t in enumerate(totals):
+			if t == 0.0:
+				logging.warning("Nonterminal with zero expectation %d, %s", i, self.nts[i])
+				totals[i] = 1.0
 
+
+
+
+
+		self.prods = [ (x,y,z, bposteriors[i]/totals[x],i) for x,y,z,p,i in self.prods ]
+		
+		self.lexical_probs = lposteriors/totals
+		if viterbi:
+			logging.info("Viterbi LP %f", total_lp)
+		else:
+			logging.info("Total LP %f", total_lp)
+		return total_lp
 	def get_params(self):
 		"""
 		return a dict with the currene parameter values.
