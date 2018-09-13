@@ -17,6 +17,8 @@ import utility
 LENGTH_EM_ITERATIONS = 5
 LENGTH_EM_MAX_LENGTH = 20
 
+# if we get within this ratio of the best possible length distribution then we terminate. 
+TERMINATION_RATIO = 0.01
 
 class LengthDistribution:
 
@@ -24,6 +26,21 @@ class LengthDistribution:
 		# Do not use these default weights.
 		self.weights = [0.0, 1.0,1.0,1.0, 1.0, 1.0, 100.0, 100.0, 1.0, 1.0, 1.0]
 
+	def length_kld(self, mypcfg):
+		"""
+		Compute KLD between the distribution given by the weights and the true distribution.
+		"""
+		ui = inside.UnaryInside(mypcfg)
+		table = ui.compute_inside_smart(len(self.weights))
+
+		kld = 0.0
+		total = sum(self.weights)
+		for length, w in enumerate(self.weights):
+			if w > 0:
+				p = w/total
+				q = table[length, ui.start]
+				kld += p * math.log(p/q)
+		return kld
 
 	def cds(self):
 		"""
@@ -217,22 +234,18 @@ class PCFGFactory:
 		valid_target = self.length_distribution.ml_lp_general(LENGTH_EM_MAX_LENGTH)
 		logging.info("Target LP = %f, %f", targetlp, valid_target)
 		ui = inside.UnaryInside(unary_pcfg)
+		
 		for i in range(LENGTH_EM_ITERATIONS):
 
 			logging.info("Starting EM iteration %d, target = %f", i,targetlp)
-			lp = ui.train_once(self.length_distribution.weights, LENGTH_EM_MAX_LENGTH, viterbi=viterbi)
-			
-
-			# try:
-			# 	unary_pcfg, lp = self.train_unary_once(unary_pcfg, unary, LENGTH_EM_MAX_LENGTH)
-			# 	self.current = unary_pcfg
-			# except utility.ParseFailureException as e:
-			# 	logging.error("error training lengths with iteration %d", i)	
-			# 	if ignore_errors:
-			# 		logging.error("Continuing with the PCFG which may have a bad length distribution.")
-			# 		break
-			# 	else:
-			# 		raise e
+			lp,kld = ui.train_once_smart(self.length_distribution.weights, LENGTH_EM_MAX_LENGTH)
+			delta = abs(lp - targetlp)
+			logging.info("KLD from target %f", kld)
+			if delta/abs(targetlp) < TERMINATION_RATIO:
+				logging.info("Converged enough.  %f < %f ",  delta/abs(lp) , TERMINATION_RATIO)
+				break
+		else:
+			logging.warning("Reached maximum number of iterations without reaching convergence threshold. Check that length distribution is ok.")
 			
 		
 		unary_pcfg.parameters = ui.get_params()
@@ -240,7 +253,7 @@ class PCFGFactory:
 		final_pcfg = pcfg.PCFG()
 		#print("nonterminals", unary_pcfg.nonterminals)
 		for nt in lexical_index:
-			
+
 			if (nt,unary) in unary_pcfg.parameters:
 				totalp = unary_pcfg.parameters[(nt,unary)]
 				k = len(lexical_index[nt])

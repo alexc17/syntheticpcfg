@@ -139,9 +139,10 @@ class UnaryInside:
 
 	def add_to_posteriors_smart(self, length, max_length, inside, outside, weight, lposteriors, bposteriors):
 		"""
-		we resuse the chart from the largest one, making adjustments as nceesary to the outside ones.
+		we resuse the chart from the largest one, making adjustments as necessary to the outside ones.
 		"""
 		tp = inside[0,length,self.start]
+		assert(tp > 0)
 		diff = max_length - length
 		alpha = weight /tp 
 		for i in range(length):
@@ -157,6 +158,7 @@ class UnaryInside:
 				for middle in range(start+1, end):
 					for x,y,z,p,i in self.prods:
 						bposteriors[i] += alpha * p * inside[start,middle,y] * inside[middle,end,z] * outside[start,diff + end,x]
+
 		return math.log(tp) * weight
 
 	def train_once_smart(self, weights, max_length):
@@ -167,14 +169,33 @@ class UnaryInside:
 		outside = self.compute_outside(inside, max_length)
 		lposteriors = np.zeros(self.nnts)
 		bposteriors = np.zeros(len(self.prods))
-
+		totalw = sum(weights[:max_length+1])
 		total_lp = 0.0
+		kld = 0.0
 		for length, weight in enumerate(weights[:max_length+1]):
 			#print(length,weight)
 			if weight > 0:
+				p = weight/totalw
+				q = inside[length, self.start]
+				kld += p * math.log(p/q)
 				total_lp += self.add_to_posteriors_smart(length, max_length, inside, outside, weight, lposteriors, bposteriors)
+		logging.info("LP = %f", total_lp)
+		self.process_posteriors(lposteriors, bposteriors)
+		return total_lp,kld
 
+	def process_posteriors(self, lposteriors, bposteriors):
+		totals = np.zeros(self.nnts)
+		totals += lposteriors
+		for x,y,z,p,i in self.prods:
+			totals[x] += bposteriors[i]
+		
+		for i,t in enumerate(totals):
+			if t == 0.0:
+				logging.warning("Nonterminal with zero expectation %d, %s", i, self.nts[i])
+				totals[i] = 1.0
 
+		self.prods = [ (x,y,z, bposteriors[i]/totals[x],i) for x,y,z,p,i in self.prods ]
+		self.lexical_probs = lposteriors/totals
 
 	def train_once(self, weights, max_length, viterbi=False):
 		
@@ -188,28 +209,13 @@ class UnaryInside:
 					total_lp += self.add_to_posteriors_viterbi(length, weight, lposteriors, bposteriors)
 				else:
 					total_lp += self.add_to_posteriors(length, weight, lposteriors, bposteriors)
-		totals = np.zeros(self.nnts)
-		totals += lposteriors
-		for x,y,z,p,i in self.prods:
-			totals[x] += bposteriors[i]
-		# FIXME check for zeroes .
-		for i,t in enumerate(totals):
-			if t == 0.0:
-				logging.warning("Nonterminal with zero expectation %d, %s", i, self.nts[i])
-				totals[i] = 1.0
-
-
-
-
-
-		self.prods = [ (x,y,z, bposteriors[i]/totals[x],i) for x,y,z,p,i in self.prods ]
-		
-		self.lexical_probs = lposteriors/totals
+		self.process_posteriors(lposteriors, bposteriors)
 		if viterbi:
 			logging.info("Viterbi LP %f", total_lp)
 		else:
 			logging.info("Total LP %f", total_lp)
 		return total_lp
+
 	def get_params(self):
 		"""
 		return a dict with the currene parameter values.
