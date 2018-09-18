@@ -11,6 +11,7 @@ class CFGFactory:
 		self.number_nonterminals = 5
 		self.binary_rules = 40
 		self.lexical_rules = 100
+		self.strict_cnf = True
 
 
 	def generate_nonterminals(self):
@@ -66,8 +67,11 @@ class CFGFactory:
 			rhs = lexicon[numpy.random.choice(range(len(lexicon)))]
 			lprods.add( (lhs,rhs))
 		while len(bprods) < self.binary_rules:
-			a,b,c = numpy.random.choice(nonterminals,size=3)
-			
+			if self.strict_cnf:
+				a =  numpy.random.choice(nonterminals)
+				b,c = numpy.random.choice(nonterminals[1:],size=2)
+			else:
+				a,b,c = numpy.random.choice(nonterminals,size=3)
 			bprods.add( (a,b,c))	
 		my_cfg = cfg.CFG()
 		my_cfg.start = nonterminals[0]

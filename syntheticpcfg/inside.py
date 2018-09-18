@@ -165,6 +165,7 @@ class UnaryInside:
 		"""
 		Only compute the inside and outside charts once.
 		"""
+		## we don't need the full chart but this isn;t a bottleneck
 		inside = self.compute_inside(max_length)		
 		outside = self.compute_outside(inside, max_length)
 		lposteriors = np.zeros(self.nnts)
@@ -176,7 +177,9 @@ class UnaryInside:
 			#print(length,weight)
 			if weight > 0:
 				p = weight/totalw
-				q = inside[length, self.start]
+				q = inside[0,length, self.start]
+				if q == 0:
+					raise ParseFailureException(length)
 				kld += p * math.log(p/q)
 				total_lp += self.add_to_posteriors_smart(length, max_length, inside, outside, weight, lposteriors, bposteriors)
 		logging.info("LP = %f", total_lp)

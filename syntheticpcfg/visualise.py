@@ -1,4 +1,3 @@
-# Sample from a given grammar
 
 
 import argparse
@@ -15,7 +14,7 @@ parser.add_argument("inputfilename", help="File where the given PCFG is.")
 
 args = parser.parse_args()
 
-
+mypcfg = 
 ## Compute useful stuff and output it.
 # Connectivity
 # expectations of each production, terminal, nonterminal, 

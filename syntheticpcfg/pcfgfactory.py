@@ -18,7 +18,7 @@ LENGTH_EM_ITERATIONS = 5
 LENGTH_EM_MAX_LENGTH = 20
 
 # if we get within this ratio of the best possible length distribution then we terminate. 
-TERMINATION_RATIO = 0.01
+TERMINATION_KLD = 0.05
 
 class LengthDistribution:
 
@@ -52,9 +52,10 @@ class LengthDistribution:
 	def wsj(self):
 		"""
 		Set distribution of lengths to that of the WSJ corpus.
-		Only taking the first 40 for efficiency reasons.
+		Only taking the first 50 for efficiency reasons.
 		"""
-		self.weights = [0, 137, 282, 309, 434, 504, 630, 739, 929, 992, 1101, 1226, 1508, 1457, 1540, 1529, 1640, 1616, 1714, 1580, 1666, 1599, 1566, 1566, 1392, 1452, 1365, 1245, 1146, 1102, 1031, 881, 768, 696, 581, 548, 483, 441, 384, 352, 263]
+		#self.weights = [0, 137, 282, 309, 434, 504, 630, 739, 929, 992, 1101, 1226, 1508, 1457, 1540, 1529, 1640, 1616, 1714, 1580, 1666, 1599, 1566, 1566, 1392, 1452, 1365, 1245, 1146, 1102, 1031, 881, 768, 696, 581, 548, 483, 441, 384, 352, 263]
+		self.weights = [0, 137, 282, 309, 434, 504, 630, 739, 929, 992, 1101, 1226, 1508, 1457, 1540, 1529, 1640, 1616, 1714, 1580, 1666, 1599, 1566, 1566, 1392, 1452, 1365, 1245, 1146, 1102, 1031, 881, 768, 696, 581, 548, 483, 441, 384, 352, 263, 252, 237, 184, 159, 121, 99, 89, 74, 58, 56]
 		#[0, 137, 282, 309, 434, 504, 630, 739, 929, 992, 1101, 1226, 1508, 1457, 1540, 1529, 1640, 1616, 1714, 1580, 1666, 1599, 1566, 1566, 1392, 1452, 1365, 1245, 1146, 1102, 1031, 881, 768, 696, 581, 548, 483, 441, 384, 352, 263, 252, 237, 184, 159, 121, 99, 89, 74, 58, 56, 62, 40, 27, 29, 27, 19, 28, 9, 14, 17, 13, 9, 8, 2, 1, 2, 2, 5, 6, 2, 1, 1, 6, 1, 3, 1, 3, 2, 0, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
 	def ml_lp(self, max_length):
@@ -241,11 +242,11 @@ class PCFGFactory:
 			lp,kld = ui.train_once_smart(self.length_distribution.weights, LENGTH_EM_MAX_LENGTH)
 			delta = abs(lp - targetlp)
 			logging.info("KLD from target %f", kld)
-			if delta/abs(targetlp) < TERMINATION_RATIO:
-				logging.info("Converged enough.  %f < %f ",  delta/abs(lp) , TERMINATION_RATIO)
+			if kld< TERMINATION_KLD:
+				logging.info("Converged enough.  %f < %f ",  kld , TERMINATION_KLD)
 				break
 		else:
-			logging.warning("Reached maximum number of iterations without reaching convergence threshold. Check that length distribution is ok.")
+			logging.warning("Reached maximum number of iterations without reaching convergence threshold. Final KLD is %f.",kld)
 			
 		
 		unary_pcfg.parameters = ui.get_params()

@@ -199,3 +199,18 @@ def generate_lexicon(n):
 		if not newWord in dictionary:
 			dictionary.add(newWord)
 	return dictionary
+
+
+	
+def catalan_numbers(n, cache = {}):
+	if cache and n in cache:
+		return cache[n]
+	if n == 0:
+		cache[0] = 1
+		return 1
+	else:
+		cn = 0
+		for i in range(n):
+			cn += catalan_numbers(i, cache) * catalan_numbers(n-1-i, cache)
+		cache[n] = cn
+		return cn

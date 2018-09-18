@@ -20,7 +20,10 @@ parser.add_argument("--pitmanyor",help="Use Pitman Yor process for lexical probs
 parser.add_argument("--dirichletparam",help="Set Dirichlet for lexical probs",type=int,default=1.0)
 
 parser.add_argument("--cdslength", help="Use distribution of lengths from corpus of English child directed speech.", action=store_true)
+parser.add_argument("--nonstrictcnf", help="Allow start stmbol to occur on right hand side of production.", action=store_true)
+
 parser.add_argument("--corpuslength", help="Use distribution of lengths from a chosen corpus. Filename of corpus.")
+
 
 args = parser.parse_args()
 
@@ -41,7 +44,8 @@ factory.cfgfactory.number_terminals = args.terminals
 factory.cfgfactory.binary_rules = args.binaryproductions
 factory.cfgfactory.lexical_rules = args.lexicalproductions
 
-
+if args.nonstrictcnf:
+	factory.cfgfactory.strict_cnf = False
 if args.pitmanyor:
 	factory.lexical_distribution = pcfgfactory.LexicalPitmanYor()
 else:
@@ -54,7 +58,6 @@ elif args.corpuslength:
 
 # sample and save
 pcfg = factory.sample()
-
 pcfg.store(args.outputfilename)
 
 
