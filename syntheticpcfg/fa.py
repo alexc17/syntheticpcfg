@@ -78,21 +78,25 @@ def make_prefix(a, terminals):
 		my_fa.transitions.add( (1,b,1))
 	return my_fa
 
-def make_infix(a, terminals):
+
+
+def make_ngram( sequence, terminals):
 	"""
-	Non deterministic.
+	deterministic.
 	"""
 	my_fa = FiniteAutomaton()
+	n = length(sequence)
 	my_fa.states.add(0)
-	my_fa.states.add(1)
 	my_fa.start = 0
-	my_fa.end = 1
-	my_fa.transitions.add( (0,a,1))
-	for b in terminals:
-		if b != a:
-			my_fa.transitions.add( (0,b,0))
-		my_fa.transitions.add( (1,b,1))
-	return my_fa
+	for i,a in enumerate(sequence):
+		my_fa.states.add(i+1)
+		my_fa.transitions.add( (i,a,i+1))
+		for b in terminals:
+			if a <>b:
+				my_fa.transitions.add((i,b,0))
+	my_fa.end=n
+	for a in terminals:
+		my_fa.transitions.add((n,a,n))
 
 
 
