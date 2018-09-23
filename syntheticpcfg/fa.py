@@ -92,7 +92,7 @@ def make_ngram( sequence, terminals):
 		my_fa.states.add(i+1)
 		my_fa.transitions.add( (i,a,i+1))
 		for b in terminals:
-			if a <>b:
+			if a != b:
 				my_fa.transitions.add((i,b,0))
 	my_fa.end=n
 	for a in terminals:

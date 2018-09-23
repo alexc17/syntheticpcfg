@@ -281,12 +281,19 @@ class InsideComputation:
 
 	def inside_log_probability(self, sentence):
 		table,_ = self._compute_inside_table(sentence)
-		return table[(0,self.start,len(sentence))]
+		idx = (0,self.start,len(sentence))
+		if idx in table:
+			return table[idx]
+		else:
+			raise ParseFailureException(sentence)
 
 	def inside_bracketed_log_probability(self, tree):
 		table = self._bracketed_log_probability(tree)
 		#print(table)
-		return table[self.start]
+		if self.start in table:
+			return table[self.start]
+		else:
+			raise ParseFailureException()
 
 	def _compute_inside_table(self,sentence,mode=0):
 		"""

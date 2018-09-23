@@ -10,6 +10,11 @@ import pcfg
 import utility
 import inside
 
+import sys
+
+if sys.version_info[0] < 3:
+    raise Exception("Python 3 or a more recent version is required.")
+    
 parser = argparse.ArgumentParser(description='Sample from a given PCFG')
 
 parser.add_argument("inputfilename", help="File where the given PCFG is.")
