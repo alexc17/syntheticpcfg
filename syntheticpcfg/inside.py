@@ -258,7 +258,7 @@ class InsideComputation:
 	def _bracketed_log_probability(self, tree):
 		"""
 		Compute log prob of all derivations with this bracketed tree.
-		Return a dict mapping nontermials to lof probs
+		Return a dict mapping nontermials to log probs
 		"""
 		if len(tree) == 2:
 			return { prod[0]: lp for prod,lp in self.lprod_index[tree[1]]}
@@ -276,6 +276,48 @@ class InsideComputation:
 						else:
 							answer[a] = score
 			return answer 
+
+	def _bracketed_viterbi_probability(self, tree, mapping):
+		"""
+		Compute log prob of maximum derivations with this bracketed tree.
+		Return a dict mapping nontermials to log probs, prod pairs
+		"""
+		if len(tree) == 2:
+			localt = { prod[0]: (lp,prod) for prod,lp in self.lprod_index[tree[1]]}
+			mapping[tree] = localt
+			return localt
+		else:
+			left = self._bracketed_viterbi_probability(tree[1],mapping)
+			right = self._bracketed_viterbi_probability(tree[2],mapping)
+			answer = {}
+			for leftcat in left:
+				for prod, prod_lp in self.bprod_index[leftcat]:
+					a,b,c = prod
+					if c in right:
+						score = prod_lp + left[leftcat][0] + right[c][0]
+						if a in answer:
+							if score > answer[a][0]:
+								answer[a] = (score, prod)
+						else:
+							answer[a] = (score,prod)
+			mapping[tree] = answer
+			return answer 
+
+	def bracketed_viterbi_parse(self,tree):
+		mapping = {}
+		root = self._bracketed_viterbi_probability(tree,mapping)
+		def reconstruct_tree(label, tree, mapping):
+			lp, prod = mapping[tree][label]
+			assert label == prod[0]
+			if len(tree) == 2:
+				return prod
+			else:
+				a,b,c = prod
+				left_subtree = reconstruct_tree(b, tree[1], mapping)
+				right_subtree = reconstruct_tree(c, tree[2], mapping)
+				return (a, left_subtree, right_subtree)
+		return reconstruct_tree(self.start,tree,mapping)
+
 
 
 
