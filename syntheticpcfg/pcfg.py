@@ -128,7 +128,7 @@ class PCFG:
 		self.nonterminals = set( [ prod[0] for prod in self.productions])
 		self.terminals = set( [ prod[1] for prod in self.productions if len(prod) == 2])
 		self.parameters = { prod : self.parameters[prod] for prod in self.productions}
-
+		
 	def normalise(self):
 		totals = defaultdict(float)
 		for prod in self.productions:
