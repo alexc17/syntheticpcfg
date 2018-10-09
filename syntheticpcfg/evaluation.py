@@ -13,7 +13,7 @@ from sklearn.metrics.cluster import v_measure_score
 
 
 
-
+## Weak probabilistic
 
 def string_kld(target, hypothesis, samples= 1000):
 	### sample n trees from target. 
@@ -29,9 +29,9 @@ def string_kld(target, hypothesis, samples= 1000):
 		total += lp - lq
 	return total/samples
 
-
+# Strong probabilistic
 def bracketed_kld(target, hypothesis, samples= 1000):
-	### sample n trees from target. 
+	### sample n trees from target. FAST
 	inside_target = inside.InsideComputation(target)
 	inside_hypothesis = inside.InsideComputation(hypothesis)
 	sampler = pcfg.Sampler(target)
@@ -125,7 +125,7 @@ def best_rmap_preterminals(g1, g2, samples = 1000):
 		map21[nt] = max( g1.nonterminals, key = lambda x : ctable[(x,nt)] ) 
 	return map21
 
-def bracketed_exact_match(target, hypothesis, samples = 1000):
+def bracketed_exact_match(target, hypothesis, test_target=False, samples = 1000, verbose=False):
 	"""
 	Propprtion of trees whose viterbi parse has the same shape as the original.
 	"""
@@ -133,23 +133,42 @@ def bracketed_exact_match(target, hypothesis, samples = 1000):
 	inside_hypothesis = inside.InsideComputation(hypothesis)
 	sampler = pcfg.Sampler(target)
 	total = 0.0
+	ttotal = 0.0
 	for i in range(samples):
 		t = sampler.sample_tree()
 		tut = utility.tree_to_unlabeled_tree(t)
 		s = utility.collect_yield(t)
+		parsed = False
 		try:
 			th = inside_hypothesis.viterbi_parse(s)
+			parsed = True
 			thut = utility.tree_to_unlabeled_tree(th)
 			if thut == tut:
 				total += 1
 		except utility.ParseFailureException as e:
 			logging.warning("Parse failure", s)
-		
-	return total/samples
+			if verbose:
+				print("Parse failure", s)
+		if test_target:
+			target_viterbi_t = inside_target.viterbi_parse(s)
+			target_viterbi_ut = utility.tree_to_unlabeled_tree(target_viterbi_t)
+			if target_viterbi_ut == tut:
+				ttotal += 1
+				if parsed and verbose and thut != tut:
+					print("Error in string", s)
+					print("Hypothesis:",th)
+					print("Target/Gold", target_viterbi_t)
+
+	if test_target:
+		return total/samples, ttotal/samples
+	else:
+		return total/samples
 
 def labeled_exact_match(target, hypothesis, samples = 1000):
 	"""
 	Propprtion of trees whose viterbi parse has the same shape as the original.
+
+	SLOW
 	"""
 	inside_target = inside.InsideComputation(target)
 	inside_hypothesis = inside.InsideComputation(hypothesis)
@@ -194,6 +213,7 @@ def labeled_kld_exact(target, hypothesis, injection):
 			kld += e * math.log(alpha/beta)
 	return kld
 
+# Strong non probabilistic
 
 def test_subgrammar(target, hypothesis, samples = 1000):
 	"""
@@ -217,6 +237,8 @@ def test_subgrammar(target, hypothesis, samples = 1000):
 		if not newprod in hypothesis.parameters:
 			return False
 	return True
+
+# Weak non probabilistic
 
 def test_coverage(target,hypothesis, samples = 1000):
 	"""

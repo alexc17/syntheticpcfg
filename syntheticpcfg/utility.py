@@ -2,6 +2,7 @@
 import random
 import math
 import matplotlib.pyplot as plt
+from collections import defaultdict
 
 class ParseFailureException(Exception):
     pass
@@ -23,6 +24,27 @@ def tree_to_string(tree):
 	else:
 		return "(" + tree[0] + " " + tree_to_string(tree[1]) + " " +tree_to_string(tree[2]) +  ")"
 
+def tree_to_unlabeled_tree(tree):
+	if len(tree) == 2:
+		return tree[1]
+	else:
+		return (tree_to_unlabeled_tree(tree[1]), tree_to_unlabeled_tree(tree[2]))
+
+def relabel_tree(tree, nt_map):
+	if len(tree) == 2:
+		return (nt_map[tree[0]],tree[1])
+	else:
+		return (nt_map[tree[0]],relabel_tree(tree[1],nt_map), relabel_tree(tree[2],nt_map))
+
+def tree_to_preterminals(tree):
+	"""
+	return a list of the preterminals in the tree.
+	"""
+	if len(tree) == 2:
+		return (tree[0],)
+	else:
+		# inefficient but it doesnt matter.
+		return tree_to_preterminals(tree[1]) + tree_to_preterminals(tree[2])
 
 def tree_depth(tree):
 	if len(tree) == 2:
@@ -91,30 +113,34 @@ def knuth_tree(tree):
             return (location, tree[0], tree[1])
     return knuth_layout(tree,0)
 
-def plot_tree_with_layout(tree):
+def plot_tree_with_layout(tree,w):
     
     x,y = tree[0]
     label = tree[1]
-    diff = len(label) *0.15
+    character_offset = w * 0.01
+
+    diff = len(label) * character_offset
     plt.text(x-diff,-y,label)
     if len(tree) == 4:
         for subtree in tree[2:]:
             x2,y2 = subtree[0]
             plt.plot( [x,x2],[-y-0.2,-y2+0.4],'b')
-            plot_tree_with_layout(subtree)
+            plot_tree_with_layout(subtree,w)
     else:
+
         plt.plot( [x,x],[-y-0.2,-y-0.6],'r' )
         leaf = tree[2]
-        diff = len(leaf) *0.15
-        plt.text(x-diff,-y-1.0,leaf)
+        ldiff = len(leaf) * character_offset
+        # diff = 0
+        plt.text(x-ldiff,-y-1.0,leaf)
     
 def plot_tree(tree):
 	l = len(collect_yield(tree))
 	d = tree_depth(tree)
-	plt.figure(figsize=(l/2+1, d/2+1))
+	plt.figure(figsize=(l/2, d/2))
 	plt.axis('off')
 	layout = knuth_tree(tree)
-	plot_tree_with_layout(layout)
+	plot_tree_with_layout(layout,l+d-1)
 	plt.show()
 
 def generateRandomString(n):
@@ -200,8 +226,22 @@ def generate_lexicon(n):
 			dictionary.add(newWord)
 	return dictionary
 
+def variation_of_information(counter):
+	total = sum(counter.values())
+	x = defaultdict(float)
+	y = defaultdict(float)
+	for (a,b) in counter:
+		n = counter[(a,b)]
+		x[a] += n
+		y[b] += n
+	vi = 0
+	for (a,b) in counter:
+		p = x[a]/total
+		q = y[b]/total
+		r = counter[(a,b)]/total
+		vi += r * (math.log(r/p)  + math.log(r/q))
+	return -vi
 
-	
 def catalan_numbers(n, cache = {}):
 	if cache and n in cache:
 		return cache[n]

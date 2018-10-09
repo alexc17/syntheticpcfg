@@ -300,12 +300,16 @@ class InsideComputation:
 								answer[a] = (score, prod)
 						else:
 							answer[a] = (score,prod)
+			if len(answer) == 0:
+				raise ParseFailureException()
 			mapping[tree] = answer
 			return answer 
 
 	def bracketed_viterbi_parse(self,tree):
 		mapping = {}
 		root = self._bracketed_viterbi_probability(tree,mapping)
+		if not self.start in root:
+			raise ParseFailureException()
 		def reconstruct_tree(label, tree, mapping):
 			lp, prod = mapping[tree][label]
 			assert label == prod[0]
@@ -343,7 +347,6 @@ class InsideComputation:
 		mode 1 max log prob
 		mode 2 counts
 		"""
-	
 		## simple cky but sparse
 		l = len(sentence)
 		# take the ;eft hand one and then loop through all productions _ -> A _
@@ -527,3 +530,6 @@ class InsideComputation:
 		return table[item]
 
 
+	def most_likely_unlabeled_tree(self, sentence):
+		"""
+		Compute the most likely bracketed tree

@@ -1,7 +1,7 @@
 
 ## Python 3 
 
-
+import logging
 import math
 import numpy as np
 import numpy.linalg
@@ -137,8 +137,9 @@ class PCFG:
 			p = self.parameters[prod]
 			if p == 0.0:
 				raise ValueError("zero parameter",prod)
-			self.parameters[prod] = p/ totals[prod[0]]
-			self.log_parameters[prod] = math.log(p/ totals[prod[0]])
+			param = p/ totals[prod[0]]
+			self.parameters[prod] = param
+			self.log_parameters[prod] = math.log(param)
 
 
 
@@ -346,7 +347,7 @@ class PCFG:
 				transitionMatrix[lhs,index[prod[2]]] += alpha
 		
 		#print(transitionMatrix)
-		r2 = numpy.linalg.inv(np.eye(n) - transitionMatrix)
+		#r2 = numpy.linalg.inv(np.eye(n) - transitionMatrix)
 		#print(r2)
 		result = np.dot(numpy.linalg.inv(np.eye(n) - transitionMatrix),transitionMatrix)
 		si = index[self.start]
@@ -391,6 +392,31 @@ class PCFG:
 		for nt in lprodmap:
 			newz[nt] += lprodmap[nt]
 		return newz
+
+	def oracle_fkp1(self):
+		"""
+		Return a list of terminals that characterise the nonterminals,
+		picking the most likely one.
+
+		Start with "S"
+		"""
+		lhs_counter = defaultdict(list)
+		answer = []
+		for prod in self.productions:
+			if len(prod) == 2:
+				lhs_counter[prod[1]].append(prod[0])
+		nts = [ self.start ]
+		for nt in self.nonterminals:
+			if nt != self.start:
+				nts.append(nt)
+		for nt in nts:
+			candidates = [ a for a in self.terminals if lhs_counter[a] == [nt] ]
+			if len(candidates) == 0:
+				return ()
+			else:
+				answer.append( max(candidates, key = lambda a : self.parameters[ (nt,a)]))
+		return answer
+
 
 
 def estimate_pcfg_from_treebank(filename):
