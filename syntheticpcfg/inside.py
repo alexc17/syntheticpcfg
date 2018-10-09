@@ -530,6 +530,3 @@ class InsideComputation:
 		return table[item]
 
 
-	def most_likely_unlabeled_tree(self, sentence):
-		"""
-		Compute the most likely bracketed tree
