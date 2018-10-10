@@ -141,7 +141,11 @@ class PCFG:
 			self.parameters[prod] = param
 			self.log_parameters[prod] = math.log(param)
 
-
+	def check_normalisation(self):
+		totals = defaultdict(float)
+		for prod in self.productions:
+			totals[prod[0]] += self.parameters[prod]
+		return totals
 
 	def log_probability_derivation(self, tree):
 		"""
@@ -416,6 +420,24 @@ class PCFG:
 			else:
 				answer.append( max(candidates, key = lambda a : self.parameters[ (nt,a)]))
 		return answer
+
+	def convert_parameters(self):
+		"""
+		Assume pcfg1 has parameters in xi format.
+		Convert these to pi
+		"""
+		pcfg1 = self.copy()
+		expectations = pcfg1.compute_partition_function_fast()
+		for prod in pcfg1.productions:
+			param = pcfg1.parameters[prod]
+			if len(prod) == 2:
+				nt,a = prod
+				newparam = param/expectations[nt]
+			else:
+				a,b,c = prod
+				newparam = param * expectations[b] * expectations[c] / expectations[a]
+			pcfg1.parameters[prod] = newparam
+		return pcfg1
 
 
 

@@ -3,9 +3,10 @@
 import math
 import utility
 import inside
+import pcfg
 
 from utility import ParseFailureException
-
+from collections import Counter
 
 max_length = 6
 max_ratios = 1000
@@ -24,19 +25,64 @@ class OracleLearner:
 	def __init__(self, insider, sentences):
 		self.insider = insider
 		self.sentences = sentences
+		self.start = None
 		self.kernels = None
 		self.te = None
 		self.cache = {}
-		self.terminals = self.gather_terminals(sentences)
+		self.terminals = self.gather_terminals()
 
+	def find_predictive_context(self, a, max_tests = 100):
+		## find context that maximises probability of a
+		best = None
+		bestcp = 0.0
+		n = 0
+		for s in self.sentences:
+			for i,b in enumerate(s):
+				if b == a:
+					p = self.probability(s)
 
-	def oracle_learner(self):
-		start = self.pick_start()
-		ntmap = {start: "S"}
+					l = s[:i]
+					r = s[i+1:]
+					q = self.probability(l + ("",) + r)
+					n += 1
+					cp = p/q
+					if cp > bestcp:
+						bestcp = cp
+						best = (l,r)
+			if n > max_tests:
+				break
+		return best, bestcp
+
+	def find_most_predicted_string(self,l,r):
+		bestp = 0
+		best = None
+		for a in self.terminals:
+			p = self.probability( l + (a,) + r)/self.te[a]
+			if p > bestp:
+				bestp =p
+				best = a
+		return best
+
+	def pick_kernels(self):
+		F = {}
+		K = set()
+		for a in self.terminals:
+			f, cp = self.find_predictive_context(a)
+			F[a] = f
+			a = self.find_most_predicted_string(*f)
+			K.add(a)
+		self.kernels = list(K)
+		self.features = F
+
+	def learn(self):
+		self.estimate_terminal_expectations()
+		self.pick_kernels()
+		self.start = self.pick_start()
+		ntmap = {self.start: "S"}
 		for a in self.kernels:
-			if a != start:
+			if a != self.start:
 				ntmap[a] = "NT" + a
-		terminals = self.gather_terminals()
+		
 		if not self.te:
 			self.te = estimate_terminal_expectations(sentences)
 		parameters = {}
@@ -72,7 +118,7 @@ class OracleLearner:
 
 	def pick_start(self):
 	
-		return max(self.kernels, key = lambda x : self.probability())
+		return max(self.kernels, key = lambda x : self.probability((x,)))
 
 	def probability(self,s):
 		if s in self.cache:
@@ -98,7 +144,7 @@ class OracleLearner:
 		for s in self.sentences:
 			for a in s:
 				lcounter[a] += 1
-		return { a: lcounter[a]/n for a in lcounter}
+		self.te =  { a: lcounter[a]/n for a in lcounter}
 
 	def test_binary(self, a,b,c):
 		ratios = {}
