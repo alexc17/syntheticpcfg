@@ -326,7 +326,12 @@ class InsideComputation:
 		return reconstruct_tree(self.start,tree,mapping)
 
 
-
+	def inside_probability(self,sentence):
+		try:
+			lp = self.inside_log_probability(sentence)
+			return math.exp(lp)
+		except ParseFailureException:
+			return 0
 
 	def inside_log_probability(self, sentence):
 		table,_ = self._compute_inside_table(sentence)
@@ -344,7 +349,7 @@ class InsideComputation:
 		else:
 			raise ParseFailureException()
 
-	def inside_log_probability_context(l,r,wildcard=""):
+	def inside_log_probability_context(self,l,r,wildcard=""):
 		sentence = l + (wildcard,) + r
 		table,_ = self._compute_inside_table(sentence,wildcard=wildcard)
 		idx = (0,self.start,len(sentence))
@@ -374,11 +379,11 @@ class InsideComputation:
 			if a == wildcard:
 				for nt in self.nonterminals:
 					if mode == 0:	
-						score = math.log(sum( [ self.parameters[prod] for prod in self.parameters if prod[0] == nt]))
+						score = math.log(sum( [ self.parameters[prod] for prod in self.parameters if prod[0] == nt and len(prod) == 2]))
 					elif mode == 1:	
-						score = math.log(max( [ self.parameters[prod] for prod in self.parameters if prod[0] == nt]))
+						score = math.log(max( [ self.parameters[prod] for prod in self.parameters if prod[0] == nt and len(prod) == 2]))
 					elif mode == 2:
-						score = len( [ prod for prod in self.parameters if prod[0] == nt])				
+						score = len( [ prod for prod in self.parameters if prod[0] == nt])	
 					_add_to_chart(i,nt,i+1,score)
 			else:
 				for prod, lp in self.lprod_index[a]:
