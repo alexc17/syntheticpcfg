@@ -246,6 +246,9 @@ class InsideComputation:
 		self.bprod_index = collections.defaultdict(list)
 		self.rprod_index = collections.defaultdict(list)
 		self.log_parameters = pcfg.log_parameters.copy()
+		self.parameters = pcfg.parameters.copy()
+		self.terminals = list(pcfg.terminals)
+		self.nonterminals = list(pcfg.nonterminals)
 		self.start = pcfg.start
 		for prod in pcfg.productions:
 			if len(prod) == 2:
@@ -341,7 +344,16 @@ class InsideComputation:
 		else:
 			raise ParseFailureException()
 
-	def _compute_inside_table(self,sentence,mode=0):
+	def inside_log_probability_context(l,r,wildcard=""):
+		sentence = l + (wildcard,) + r
+		table,_ = self._compute_inside_table(sentence,wildcard=wildcard)
+		idx = (0,self.start,len(sentence))
+		if idx in table:
+			return table[idx]
+		else:
+			raise ParseFailureException(sentence)
+
+	def _compute_inside_table(self,sentence,mode=0, wildcard = ""):
 		"""
 		mode 0 logprobs
 		mode 1 max log prob
@@ -359,14 +371,24 @@ class InsideComputation:
 			table2[(start,end)].append((category,score))
 
 		for i,a in enumerate(sentence):
-			for prod, lp in self.lprod_index[a]:
-				if mode == 0:
-					score = lp
-				elif mode == 1:
-					score = (lp,)
-				else:
-					score= 1
-				_add_to_chart(i,prod[0],i+1,score)
+			if a == wildcard:
+				for nt in self.nonterminals:
+					if mode == 0:	
+						score = math.log(sum( [ self.parameters[prod] for prod in self.parameters if prod[0] == nt]))
+					elif mode == 1:	
+						score = math.log(max( [ self.parameters[prod] for prod in self.parameters if prod[0] == nt]))
+					elif mode == 2:
+						score = len( [ prod for prod in self.parameters if prod[0] == nt])				
+					_add_to_chart(i,nt,i+1,score)
+			else:
+				for prod, lp in self.lprod_index[a]:
+					if mode == 0:
+						score = lp
+					elif mode == 1:
+						score = (lp,)
+					else:
+						score= 1
+					_add_to_chart(i,prod[0],i+1,score)
 					
 		#print("Lexical items", table)
 		for width in range(2,l+1):
