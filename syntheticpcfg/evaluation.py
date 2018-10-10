@@ -137,9 +137,10 @@ def best_rmap_preterminals(g1, g2, samples = 1000):
 		map21[nt] = max( g1.nonterminals, key = lambda x : ctable[(x,nt)] ) 
 	return map21
 
-def bracketed_exact_match(target, hypothesis, test_target=False, samples = 1000, verbose=False):
+def bracketed_exact_match(target, hypothesis, test_viterbi = False, samples = 1000, verbose=False):
 	"""
-	Propprtion of trees whose viterbi parse has the same shape as the original.
+	Proportion of trees whose viterbi parse has the same shape as the original.
+	test viterbi option means that it will test against the viterbi parse wrt the true grammar not the original tree
 	"""
 	inside_target = inside.InsideComputation(target)
 	inside_hypothesis = inside.InsideComputation(hypothesis)
@@ -148,33 +149,21 @@ def bracketed_exact_match(target, hypothesis, test_target=False, samples = 1000,
 	ttotal = 0.0
 	for i in range(samples):
 		t = sampler.sample_tree()
-		tut = utility.tree_to_unlabeled_tree(t)
 		s = utility.collect_yield(t)
-		parsed = False
+		if test_viterbi:
+			t = inside_target.viterbi_parse(s)
+		tut = utility.tree_to_unlabeled_tree(t)
 		try:
 			th = inside_hypothesis.viterbi_parse(s)
-			parsed = True
 			thut = utility.tree_to_unlabeled_tree(th)
 			if thut == tut:
 				total += 1
+			elif verbose:
+				logging.info("Mismatch with sample %d string %s", i, s)
 		except utility.ParseFailureException as e:
 			logging.warning("Parse failure", s)
-			if verbose:
-				print("Parse failure", s)
-		if test_target:
-			target_viterbi_t = inside_target.viterbi_parse(s)
-			target_viterbi_ut = utility.tree_to_unlabeled_tree(target_viterbi_t)
-			if target_viterbi_ut == tut:
-				ttotal += 1
-				if parsed and verbose and thut != tut:
-					print("Error in string", s)
-					print("Hypothesis:",th)
-					print("Target/Gold", target_viterbi_t)
-
-	if test_target:
-		return total/samples, ttotal/samples
-	else:
-		return total/samples
+			
+	return total/samples
 
 def labeled_exact_match(target, hypothesis, samples = 1000, test_viterbi = False, verbose=False):
 	"""
