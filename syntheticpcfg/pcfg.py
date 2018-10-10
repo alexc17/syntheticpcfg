@@ -128,7 +128,12 @@ class PCFG:
 		self.nonterminals = set( [ prod[0] for prod in self.productions])
 		self.terminals = set( [ prod[1] for prod in self.productions if len(prod) == 2])
 		self.parameters = { prod : self.parameters[prod] for prod in self.productions}
-		
+	
+	def set_log_parameters(self):
+		self.log_parameters = {}
+		for prod in self.productions:
+			self.log_parameters[prod] = math.log(self.parameters[prod])
+
 	def normalise(self):
 		totals = defaultdict(float)
 		for prod in self.productions:
@@ -437,6 +442,7 @@ class PCFG:
 				a,b,c = prod
 				newparam = param * expectations[b] * expectations[c] / expectations[a]
 			pcfg1.parameters[prod] = newparam
+		pcfg1.set_log_parameters()
 		return pcfg1
 
 

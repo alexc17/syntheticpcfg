@@ -15,7 +15,7 @@ from sklearn.metrics.cluster import v_measure_score
 
 ## Weak probabilistic
 
-def string_kld(target, hypothesis, samples= 1000):
+def string_kld(target, hypothesis, samples= 1000, verbose=False):
 	### sample n trees from target. 
 	inside_target = inside.InsideComputation(target)
 	inside_hypothesis = inside.InsideComputation(hypothesis)
@@ -26,11 +26,13 @@ def string_kld(target, hypothesis, samples= 1000):
 		s = utility.collect_yield(t)
 		lp = inside_target.inside_log_probability(s)
 		lq = inside_hypothesis.inside_log_probability(s)
+		if verbose:
+			logging.info("Sample %d %s, target %f, hypothesis %f", i,t,lp,lq)
 		total += lp - lq
 	return total/samples
 
 # Strong probabilistic
-def bracketed_kld(target, hypothesis, samples= 1000):
+def bracketed_kld(target, hypothesis, samples= 1000, verbose=False):
 	### sample n trees from target. FAST
 	inside_target = inside.InsideComputation(target)
 	inside_hypothesis = inside.InsideComputation(hypothesis)
@@ -41,6 +43,8 @@ def bracketed_kld(target, hypothesis, samples= 1000):
 		
 		lp = inside_target.inside_bracketed_log_probability(t)
 		lq = inside_hypothesis.inside_bracketed_log_probability(t)
+		if verbose:
+			logging.info("Sample %d %s, target %f, hypothesis %f", i,t,lp,lq)
 		total += lp - lq
 	return total/samples
 
@@ -105,6 +109,14 @@ def best_nonterminal_map(g1,g2, samples = 1000):
 		map12[nt] = max( g2.nonterminals, key = lambda x : ctable[(nt,x)] ) 
 	return map12
 
+def best_nonterminal_rmap(g1,g2, samples = 1000):
+	ctable = nonterminal_contingency_table(g1,g2,samples)
+	map21 = {}
+	for nt in g2.nonterminals:
+		# avoiding the double list comprehension for clarity
+		map21[nt] = max( g1.nonterminals, key = lambda x : ctable[(x,nt)] ) 
+	return map21
+
 def best_map_preterminals(g1, g2, samples = 1000):
 	ctable = preterminal_contingency_table(g1, g2, samples)
 	map12 = {}
@@ -164,31 +176,38 @@ def bracketed_exact_match(target, hypothesis, test_target=False, samples = 1000,
 	else:
 		return total/samples
 
-def labeled_exact_match(target, hypothesis, samples = 1000):
+def labeled_exact_match(target, hypothesis, samples = 1000, test_viterbi = False, verbose=False):
 	"""
-	Propprtion of trees whose viterbi parse has the same shape as the original.
+	Proportion of trees whose viterbi parse is the same up to a relabeling of the hypothesis tree.
 
 	SLOW
 	"""
-	inside_target = inside.InsideComputation(target)
+	if test_viterbi:
+		inside_target = inside.InsideComputation(target)
 	inside_hypothesis = inside.InsideComputation(hypothesis)
 	sampler = pcfg.Sampler(target)
 	total = 0.0
-	ntmap = best_rmap_preterminals(target, hypothesis, samples)
+	ntmap = best_nonterminal_rmap(target, hypothesis, samples)
 	for i in range(samples):
 		t = sampler.sample_tree()
 		s = utility.collect_yield(t)
+		if test_viterbi:
+			t = inside_target.viterbi_parse(s)
 		try:
 			th = inside_hypothesis.viterbi_parse(s)
 			relabeled_tree = utility.relabel_tree(th, ntmap)
 			if relabeled_tree == t:
 				total += 1
+			elif verbose:
+				logging.info("Mismatch in trees with parse of %s", s)
+				print(relabeled_tree)
+				print(t)
 		except utility.ParseFailureException as e:
 			logging.warning("Parse failure", s)
 	return total/samples
 
 
-def labeled_kld_exact(target, hypothesis, injection):
+def labeled_kld_exact(target, hypothesis, injection=None):
 	"""
 	injection is a mapping from target to hypothesis.
 
@@ -196,6 +215,8 @@ def labeled_kld_exact(target, hypothesis, injection):
 	"""
 	# check it is an injection
 	assert len(target.nonterminals) >= len(hypothesis.nonterminals), "Hypothesis is too small (not enough nonterminals)"
+	if not injection:
+		injection = best_nonterminal_map(target,hypothesis)
 	assert len(target.nonterminals) == len(set(injection.values())), "Map is not an injection"
 	pe = target.production_expectations()
 	kld = 0.0
