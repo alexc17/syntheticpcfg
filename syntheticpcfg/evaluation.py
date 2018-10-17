@@ -273,3 +273,31 @@ def test_coverage(target,hypothesis, samples = 1000):
 				pass
 	return total/samples
 		
+
+def conditional_kld(target, hypothesis, samples = 1000):
+	"""
+	Estimate the kld between the conditional probability distributions.
+
+	for a given string $w$ D( P(tree|w) | Q(tree|w)).
+
+	difference between string KLD and tree KLD.
+	"""
+	inside_target = inside.InsideComputation(target)
+	inside_hypothesis = inside.InsideComputation(hypothesis)
+	sampler = pcfg.Sampler(target)
+	total = 0.0
+	ntmap = best_nonterminal_map(target, hypothesis, samples)
+	for i in range(samples):
+		t = sampler.sample_tree()
+		s = utility.collect_yield(t)
+
+		ptree = target.log_probability_derivation(t)
+		pstring = inside_target.inside_log_probability(s)
+
+		qt = utility.relabel_tree(t, ntmap)
+		qtree = hypothesis.log_probability_derivation(qt)
+		qstring = inside_hypothesis.inside_log_probability(s)
+
+		total += (ptree - qtree) - (pstring - qstring)
+	return total/samples	
+
