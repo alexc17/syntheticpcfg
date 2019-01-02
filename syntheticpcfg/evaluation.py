@@ -17,6 +17,7 @@ from sklearn.metrics.cluster import v_measure_score
 
 def string_kld(target, hypothesis, samples= 1000, verbose=False):
 	### sample n trees from target. 
+
 	inside_target = inside.InsideComputation(target)
 	inside_hypothesis = inside.InsideComputation(hypothesis)
 	sampler = pcfg.Sampler(target)
@@ -137,7 +138,12 @@ def best_rmap_preterminals(g1, g2, samples = 1000):
 		map21[nt] = max( g1.nonterminals, key = lambda x : ctable[(x,nt)] ) 
 	return map21
 
-def bracketed_exact_match(target, hypothesis, test_viterbi = False, samples = 1000, verbose=False):
+
+
+
+
+
+def bracketed_match(target, hypothesis, test_viterbi = False, samples = 1000, verbose=False, exact_match=True):
 	"""
 	Proportion of trees whose viterbi parse has the same shape as the original.
 	test viterbi option means that it will test against the viterbi parse wrt the true grammar not the original tree
@@ -152,18 +158,20 @@ def bracketed_exact_match(target, hypothesis, test_viterbi = False, samples = 10
 		s = utility.collect_yield(t)
 		if test_viterbi:
 			t = inside_target.viterbi_parse(s)
-		tut = utility.tree_to_unlabeled_tree(t)
 		try:
 			th = inside_hypothesis.viterbi_parse(s)
-			thut = utility.tree_to_unlabeled_tree(th)
-			if thut == tut:
-				total += 1
-			elif verbose:
-				logging.info("Mismatch with sample %d string %s", i, s)
+			if exact_match:
+				num,denom = utility.zero_one_unlabeled(t,th)
+			else:
+				num,denom = utility.microaveraged_unlabeled(t,th)
+			total += num
+			ttotal += denom
+			if verbose and num < denom:
+				logging.info("Mismatch (%d / %d) with string %s",num,denom, s)
 		except utility.ParseFailureException as e:
 			logging.warning("Parse failure", s)
 			
-	return total/samples
+	return total/ttotal
 
 def labeled_exact_match(target, hypothesis, samples = 1000, test_viterbi = False, verbose=False):
 	"""
@@ -273,8 +281,9 @@ def test_coverage(target,hypothesis, samples = 1000):
 				pass
 	return total/samples
 		
-
-def conditional_kld(target, hypothesis, samples = 1000):
+#
+# Strong probabilistic 
+def conditional_kld(target, hypothesis, samples = 1000,verbose=False):
 	"""
 	Estimate the kld between the conditional probability distributions.
 
@@ -299,5 +308,36 @@ def conditional_kld(target, hypothesis, samples = 1000):
 		qstring = inside_hypothesis.inside_log_probability(s)
 
 		total += (ptree - qtree) - (pstring - qstring)
+		if verbose:
+			logging.info("%s p(t) = %f, p(w) = %f, q(t) = %f, q(w) = %f", s, ptree,pstring,qtree,qstring)
 	return total/samples	
 
+
+def conditional_unlabeled_kld(target, hypothesis, samples = 1000, verbose=False):
+	"""
+	Estimate the kld between the conditional probability distributions.
+
+	for a given string $w$ D( P(unlabeled tree|w) | Q(tree|w)).
+
+	difference between string KLD and tree KLD.
+	"""
+	inside_target = inside.InsideComputation(target)
+	inside_hypothesis = inside.InsideComputation(hypothesis)
+	sampler = pcfg.Sampler(target)
+	total = 0.0
+	
+	for i in range(samples):
+		t = sampler.sample_tree()
+		s = utility.collect_yield(t)
+
+		ptree = inside_target.inside_bracketed_log_probability(t)
+		pstring = inside_target.inside_log_probability(s)
+
+		
+		qtree = inside_hypothesis.inside_bracketed_log_probability(t)
+		qstring = inside_hypothesis.inside_log_probability(s)
+
+		total += (ptree - qtree) - (pstring - qstring)
+		if verbose:
+			logging.info("%s p(t) = %f, p(w) = %f, q(t) = %f, q(w) = %f", s, ptree,pstring,qtree,qstring)
+	return total/samples	

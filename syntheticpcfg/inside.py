@@ -349,8 +349,8 @@ class InsideComputation:
 		else:
 			raise ParseFailureException()
 
-	def inside_log_probability_context(self,l,r,wildcard=""):
-		sentence = l + (wildcard,) + r
+	def inside_log_probability_context(self,l,r,wildcard="",width=1):
+		sentence = l + ((wildcard,)* width)  + r
 		table,_ = self._compute_inside_table(sentence,wildcard=wildcard)
 		idx = (0,self.start,len(sentence))
 		if idx in table:

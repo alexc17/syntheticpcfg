@@ -17,6 +17,54 @@ def _append_yield(tree, prefix):
 		prefix = _append_yield(tree[1], prefix)
 		prefix = _append_yield(tree[2], prefix)
 	return prefix
+
+
+def zero_one_unlabeled(tree1, tree2):
+	u1 = tree_to_unlabeled_tree(tree1)	
+	u2 = tree_to_unlabeled_tree(tree2)
+	if u1 == u2:
+		return (1,1)
+	else:
+		return (0,1)
+
+def microaveraged_unlabeled(tree1, tree2):
+	u1 = collect_unlabeled_spans(tree1)	
+	u2 = set(collect_unlabeled_spans(tree2))
+	assert len(u1) == len(u2)
+	n = len(u1)
+	x = 0
+	for span in u1:
+		if span in u2:
+			x += 1
+	return (x,n)
+	
+def collect_unlabeled_spans(tree):
+	spans = []
+	_collect_unlabeled_spans(0, tree, spans)
+	return spans[:-1]
+
+def _collect_unlabeled_spans(start, tree, spans):
+	if len(tree) == 2:
+		end = start+1
+	else:
+		end = _collect_unlabeled_spans(start, tree[1], spans)
+		end = _collect_unlabeled_spans(end, tree[2], spans)
+		spans.append((start, end))
+	return end
+
+def collect_labeled_spans(tree):
+	spans = []
+	_collect_spans(0, tree, spans)
+	return spans
+
+def _collect_spans(start, tree, spans):
+	if len(tree) == 2:
+		end = start+1
+	else:
+		end = _collect_spans(start, tree[1], spans)
+		end = _collect_spans(end, tree[2], spans)
+	spans.append((tree[0],start, end))
+	return end
 		
 def tree_to_string(tree):
 	if len(tree) == 2:

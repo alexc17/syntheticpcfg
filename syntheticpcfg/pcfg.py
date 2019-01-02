@@ -66,7 +66,8 @@ class PCFG:
 				else:
 					upcfg.productions.append(newprod)
 					upcfg.parameters[newprod] = p
-		upcfg.normalise()
+		# Why normalise?
+		upcfg.set_log_parameters()
 		return upcfg
 
 	def store(self, filename):
@@ -107,6 +108,13 @@ class PCFG:
 					p = self.parameters[prod] / (1.0 - preterminal_probs[prod.lhs])
 					fhandle.write( "%0.12f %s --> %s %s \n" % ( p, prod[0], prod[1],prod[2]))
 	
+	def rhs_index(self, terminal):
+		"""
+		Utility function that returns a list of all nonterminals that have a production
+		with this terminal on the lhs
+		"""
+		return [ prod[0] for prod in self.productions if terminal in prod]
+
 	def copy(self):
 		"""
 		return a new copy of this pcfg.
@@ -151,6 +159,13 @@ class PCFG:
 		for prod in self.productions:
 			totals[prod[0]] += self.parameters[prod]
 		return totals
+
+	def is_normalised(self, epsilon= 1e-5):
+		totals = self.check_normalisation()
+		for a in totals:
+			if abs(1.0 - totals[a]) > epsilon:
+				return False
+		return True
 
 	def log_probability_derivation(self, tree):
 		"""
@@ -426,7 +441,48 @@ class PCFG:
 				answer.append( max(candidates, key = lambda a : self.parameters[ (nt,a)]))
 		return answer
 
-	def convert_parameters(self):
+	def renormalise_divergent_wcfg(self):
+		"""
+		Algorithm from Smith and Johnson (1999) 
+		Weighted and Probabilistic Context-Free
+		Grammars Are Equally Expressive.
+
+		This gives us a wcfg which is convergent, then we can convert to a PCFG.
+		
+		"""
+		sigma = len(self.terminals)
+		beta = max ( [ self.parameters[prod] for prod in self.productions if len(prod) == 3])
+		nu = max ( [ self.parameters[prod] for prod in self.productions if len(prod) == 2])
+
+		factor = 1.0 / ( 8 * sigma * beta * nu)
+
+		pcfg1 = self.copy()
+		for prod in self.productions:
+			if len(prod) == 2:
+				pcfg1.parameters[prod] *= factor
+		pcfg1.set_log_parameters()
+		return pcfg1
+
+	def convert_parameters_pi2xi(self):
+		nte = self.nonterminal_expectations()
+		xi = {}
+		for prod in self.productions:
+			if len(prod) == 3:
+				a,b,c = prod
+				param = self.parameters[prod]
+				xib = param * nte[a]/ (nte[b] * nte[c])
+				xi[prod] = xib
+			else:
+				a,b = prod
+				param = self.parameters[prod]
+				xib = param * nte[a]
+			xi[prod] = xib
+		xipcfg = self.copy()
+		xipcfg.parameters = xi
+		xipcfg.set_log_parameters()
+		return xipcfg
+		
+	def convert_parameters_xi2pi(self):
 		"""
 		Assume pcfg1 has parameters in xi format.
 		Convert these to pi
@@ -564,6 +620,7 @@ class Sampler:
 		## construct indices for sampling
 		if random == None:
 			random = numpy.random.RandomState()
+		assert pcfg.is_normalised()
 		self.multinomials = { nt: Multinomial(pcfg,nt, cache_size,random) for nt in pcfg.nonterminals}
 		self.start = pcfg.start
 		self.max_depth = max_depth

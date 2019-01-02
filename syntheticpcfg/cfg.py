@@ -20,6 +20,38 @@ def convert_pcfg_to_cfg(pcfg, discard_zero = True):
 			assert A in my_cfg.nonterminals
 			assert B in my_cfg.nonterminals
 			assert C in my_cfg.nonterminals
+
+def load_from_file(filename):
+	grammar = CFG()
+	with open(filename) as inf:
+
+		for line in filename:
+			if len(line) == 0 or line[0] == '#':
+				continue
+			tokens = line.strip().split()
+			l = len(tokens)
+			if l == 0:
+				continue
+			if l == 1:
+				# this is a recoverable syntax error
+				raise ValueError("Only one token on line")
+			if l > 1 and tokens[1] != "->":
+				# another error 
+				raise ValueError("wrong separator: should be ->")
+			lhs = tokens[0]
+			rhs = tuple(tokens[2:])
+			prod = (lhs,) +  rhs
+			grammar.nonterminals.add(lhs)
+			grammar.productions.add(prod)
+	assert "S" in grammar.nonterminals
+	grammar.start = "S"
+	for prod in grammar.productions:
+		if len(prod) == 2:
+			a = prod[1]
+			assert not a in nonterminals
+			grammar.terminals.add(a)
+	return grammar
+	
 class CFG:
 
 	"""
