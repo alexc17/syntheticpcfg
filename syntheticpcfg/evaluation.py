@@ -256,6 +256,31 @@ def test_subgrammar(target, hypothesis, samples = 1000):
 			return False
 	return True
 
+
+def test_cfg_morphism(target, hypothesis, bijection):
+	"""
+	return true if bijection is a morphism from target to hypothesis.
+
+	"""
+	for prod in target.productions:
+		if len(prod) == 2:
+			newprod = (bijection[prod[0]], prod[1])
+		else:
+			newprod = (bijection[prod[0]], bijection[prod[1]],bijection[prod[2]])
+		if not newprod in hypothesis.parameters:
+			return False
+	return True
+
+def test_cfg_isomorphism(target, hypothesis, bijection):
+	"""
+	return true if bijection is an isomorphism from target to hypothesis.
+
+	"""
+	return (test_cfg_morphism(target, hypothesis, bijection) and 
+		test_cfg_morphism(hypothesis, target, { bijection[a]: a for a in bijection}))
+
+	
+
 # Weak non probabilistic
 
 def test_coverage(target,hypothesis, samples = 1000):

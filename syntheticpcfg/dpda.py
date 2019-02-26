@@ -19,7 +19,7 @@ class DPDA:
 
 		self.terminals = set(['a1', 'a2', 'b1', 'b2', 'x', 'y', 'z'])
 		self.stack_symbols = set(['z0', '1', '2'])
-		self.states = set(['I', 'B', 'R1','S1', 'G1', 'G2', 'S2', 'R2', 'F'])
+		self.states = set(['I', 'B', 'R1','S1', 'G1', 'G2', 'S2', 'R2','E','F'])
 		self.start_state = 'I'
 		self.final_states = set(['F'])
 		self.initial_stack = 'z0'
@@ -76,8 +76,8 @@ class DPDA:
 
 			("G1", 'z', 'z0') : ("F", ('z0',)),
 			# otherwise 
-			("G1", 'z', '1') : ("I", ('1',)),
-			("G1", 'z', '2') : ("I", ('2',)),
+			("G1", 'z', '1') : ("E", ('1',)),
+			("G1", 'z', '2') : ("E", ('2',)),
 
 			# similarly 
 			# "G2 just discards \Sigma"
@@ -114,10 +114,11 @@ class DPDA:
 
 			("R2", 'z', 'z0') : ("F", ('z0',)),
 			# otherwise 
-			("R2", 'z', '1') : ("I", ('1',)),
-			("R2", 'z', '2') : ("I", ('2',)),
+			("R2", 'z', '1') : ("E", ('1',)),
+			("R2", 'z', '2') : ("E", ('2',)),
 
-
+			("E", 'x', '1') :  ('B', ('1',)),
+			("E", 'x', '2') :  ('B', ('2',))
 
 		}
 

@@ -441,6 +441,36 @@ class PCFG:
 				answer.append( max(candidates, key = lambda a : self.parameters[ (nt,a)]))
 		return answer
 
+	def oracle_kernel(self):
+		"""
+		Return a map from nonterminals to anchors.
+		picking the most likely one.
+		Return  empty map if it does not satisfy the condition.
+		"""
+		lhs_counter = defaultdict(list)
+		answer = {}
+		for prod in self.productions:
+			if len(prod) == 2:
+				lhs_counter[prod[1]].append(prod[0])
+		
+		for nt in self.nonterminals:
+			candidates = [ a for a in self.terminals if lhs_counter[a] == [nt] ]
+			if len(candidates) == 0:
+				return {}
+			else:
+				answer[nt] =  max(candidates, key = lambda a : self.parameters[ (nt,a)])
+		return answer
+
+	def renormalise_convergent_wcfg(self):
+		"""
+		Scale all of the productions with "S" to get a globally normalised pcfg.
+		"""
+		scale = self.compute_partition_function_fast()[self.start]
+		for prod in self.parameters:
+			if prod[0]== self.start:
+				self.parameters[prod] /= scale
+		self.set_log_parameters()
+
 	def renormalise_divergent_wcfg(self):
 		"""
 		Algorithm from Smith and Johnson (1999) 
@@ -624,13 +654,17 @@ class Sampler:
 		self.multinomials = { nt: Multinomial(pcfg,nt, cache_size,random) for nt in pcfg.nonterminals}
 		self.start = pcfg.start
 		self.max_depth = max_depth
-		
+		self.insider = inside.InsideComputation(pcfg)
+		self.mypcfg = pcfg
 
 	def sample_production(self, lhs):
 		return self.multinomials[lhs].sample_production()
 
 	def sample_tree(self):
 		return self._sample_tree(self.start, 0)
+
+	def sample_string(self):
+		return collect_yield(self.sample_tree())
 
 	def _sample_tree(self, nonterminal, current_depth):
 		"""
@@ -649,4 +683,30 @@ class Sampler:
 			return (nonterminal, left_branch,right_branch)
 
 
+	def estimate_string_entropy(self,samples,max_length=50,verbose=False):
+		"""
+		Estimate the string entropy and perplexity.
+		"""
+		total_length = 0.0
+		total_samples = 0
+		total_lps = 0.0
+		total_lpt = 0.0
+		total_lpb = 0.0
 
+		for _ in range(samples):
+
+			tree = self.sample_tree()
+			s = collect_yield(tree)
+			if True:
+				total_samples += 1
+				lps = self.insider.inside_log_probability(s)
+				lpt = self.mypcfg.log_probability_derivation(tree)
+				lpb = self.insider._bracketed_log_probability(tree)[self.start]
+				total_length += len(s)
+				if verbose: print(s,lpt, lpb,lps)
+				total_lps += lps
+				total_lpt += lpt
+				total_lpb += lpb
+		sentential_entropy = -total_lps/total_samples
+		perplexity = math.exp(-total_lps/(total_length + total_samples))
+		print("SentenceEntropy %f WordPerplexity %f " % (sentential_entropy, perplexity))

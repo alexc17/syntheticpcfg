@@ -14,17 +14,19 @@ import cfgfactory
 import pcfg
 import utility
 
-LENGTH_EM_ITERATIONS = 5
+LENGTH_EM_ITERATIONS = 10
 LENGTH_EM_MAX_LENGTH = 20
 
 # if we get within this ratio of the best possible length distribution then we terminate. 
 TERMINATION_KLD = 0.05
+PITMANYOR_D = 0.9
+PITMANYOR_A = 1.2
 
 class LengthDistribution:
 
 	def __init__(self):
 		# Do not use these default weights.
-		self.weights = [0.0, 1.0,1.0,1.0, 1.0, 1.0, 100.0, 100.0, 1.0, 1.0, 1.0]
+		self.weights = [0.0, 1.0,2.0,3.0, 4.0, 5.0, 4.0, 3.0, 2.0, 1.0, 1.0]
 
 	def length_kld(self, mypcfg):
 		"""
@@ -129,7 +131,7 @@ import pitmanyor
 
 class LexicalPitmanYor:
 
-	def __init__(self,d=0.9,alpha=1.0):
+	def __init__(self,d=PITMANYOR_D,alpha=PITMANYOR_A):
 		"""
 		d is discount
 		alpha is concentration parameter: alpha close to zero means all concentrated in a single one, 

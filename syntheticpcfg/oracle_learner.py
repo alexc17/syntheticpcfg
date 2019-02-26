@@ -91,17 +91,24 @@ class OracleLearner:
 		self.features = F
 
 	def learn(self):
-		self.estimate_terminal_expectations()
-		self.pick_kernels()
+		print("Starting Oracle Learner")
+		if  self.te:
+			print("Using oracle terminal expectations")
+		else:
+			print("Estimating terminal expectations")
+			self.estimate_terminal_expectations()
+		if not self.kernels:
+			self.pick_kernels()
 		self.start = self.pick_start()
 		ntmap = {self.start: "S"}
 		for a in self.kernels:
 			if a != self.start:
 				ntmap[a] = "NT" + a
 		
-		if not self.te:
-			self.te = estimate_terminal_expectations(sentences)
+		# if not self.te:
+		# 	self.te = estimate_terminal_expectations(sentences)
 		parameters = {}
+		print("Starting Lexical rules")
 		for a in self.kernels:
 			for b in self.terminals:
 				prod = (ntmap[a],b)
@@ -113,6 +120,7 @@ class OracleLearner:
 						self.xi_minima[prod] = context
 				if xi > 0:
 					parameters[prod] =xi
+		print("Starting Binary rules")
 		for a in self.kernels:
 			for b in self.kernels:
 				for c in self.kernels:
@@ -132,6 +140,7 @@ class OracleLearner:
 		lpcfg.parameters = parameters
 		lpcfg.productions = list(parameters)
 		lpcfg.log_parameters = { prod: math.log(parameters[prod]) for prod in parameters}
+		self.kernel2nt = ntmap
 		return lpcfg
 
 	def reestimate(learned_grammar):
@@ -166,6 +175,7 @@ class OracleLearner:
 		return terminals
 
 	def estimate_terminal_expectations(self):
+		raise ValueError()
 		lcounter = Counter()
 		n = len(self.sentences)
 		for s in self.sentences:
