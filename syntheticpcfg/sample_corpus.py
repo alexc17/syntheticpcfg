@@ -15,16 +15,27 @@ import sys
 if sys.version_info[0] < 3:
     raise Exception("Python 3 or a more recent version is required.")
     
-parser = argparse.ArgumentParser(description='Sample from a given PCFG')
+parser = argparse.ArgumentParser(description="""Sample from a given PCFG.
+
+ default gives three log probabilities and a tree. 
+ the derivation
+ all derivations with the same bracketed tree and yield
+ all derivations with the same yield.
+
+The last one is expensive to compute if the string is long and the grammar large.
+
+
+ """)
 
 parser.add_argument("inputfilename", help="File where the given PCFG is.")
 parser.add_argument("outputfilename", help="File where the resulting corpus will be stored")
 
-parser.add_argument("--n", help="Number of samples", default=100,type=int)
+parser.add_argument("--n", help="Number of samples (default 1000)", default=1000,type=int)
 
 parser.add_argument("--seed",help="Choose random seed",type=int)
 parser.add_argument("--maxlength", help="limit samples to this length",type=int)
-parser.add_argument("--omitprobs", help="don't compute probabilities",action="store_true")
+parser.add_argument("--omitprobs", help="don't compute any probabilities",action="store_true")
+parser.add_argument("--omitinside", help="don't compute the inside probabilities",action="store_true")
 parser.add_argument("--yieldonly", help="just output the yield",action="store_true")
 
 
@@ -54,10 +65,14 @@ with open(args.outputfilename,'w') as outf:
 		s = utility.collect_yield(tree)
 		if not args.maxlength or len(s) <= args.maxlength:
 			if not args.omitprobs:
-				lps = insider.inside_log_probability(s)
+				
 				lpt = mypcfg.log_probability_derivation(tree)
 				lpb = insider._bracketed_log_probability(tree)[mypcfg.start]
-				outf.write( "%0.12f %0.12f %0.12f " % ( lpt, lpb, lps))
+				if args.omitinside:
+					outf.write( "%e %e " % ( lpt, lpb))
+				else:
+					lps = insider.inside_log_probability(s)
+					outf.write( "%e %e %e " % ( lpt, lpb, lps))
 			if args.yieldonly:
 				outf.write(" ".join(s) + "\n")
 			else:

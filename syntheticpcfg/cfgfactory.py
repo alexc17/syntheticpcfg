@@ -20,6 +20,24 @@ class CFGFactory:
 			nonterminals.append("NT" + str(i))
 		return nonterminals
 
+	def sample_full(self):
+		lexicon = list(utility.generate_lexicon(self.number_terminals))
+		nonterminals = self.generate_nonterminals()
+		lprods = set()
+		bprods= set()
+		for a in nonterminals:
+			for b in lexicon:
+				lprods.add((a,b))
+		for a in nonterminals:
+			for b in nonterminals[1:]:
+				for c in nonterminals[1:]:
+					bprods.add((a,b,c))
+		my_cfg = cfg.CFG()
+		my_cfg.start = nonterminals[0]
+		my_cfg.nonterminals = set(nonterminals)
+		my_cfg.terminals = set(lexicon)
+		my_cfg.productions = lprods | bprods
+		return my_cfg
 
 	def sample_trim(self):
 		"""

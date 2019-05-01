@@ -22,6 +22,7 @@ SAMPLE_CACHE_SIZE=1000
 PARTITION_FUNCTION_MAX_ITERATIONS=100
 PARTITION_FUNCTION_EPSILON=1e-9
 
+
 class PCFG:
 	"""
 	This class stores a PCFG where the underlying CFG is in CNF (more or less).
@@ -70,17 +71,20 @@ class PCFG:
 		upcfg.set_log_parameters()
 		return upcfg
 
-	def store(self, filename):
+	def store(self, filename,header=[]):
 		"""
 		Store this to a file.
 		"""
 		with open(filename,'w') as fhandle:
+			if len(header) > 0:
+				for line in header:
+					fhandle.write('#' + line + "\n")
 			for prod in self.productions:
 				p = self.parameters[prod]
 				if len(prod) == 2:	
-					fhandle.write( "%0.12f %s %s %s \n" % ( p, prod[0], RIGHT_ARROW,  prod[1] ))
+					fhandle.write( "%e %s %s %s \n" % ( p, prod[0], RIGHT_ARROW,  prod[1] ))
 				else:
-					fhandle.write( "%0.12f %s %s %s %s \n" % ( p, prod[0], RIGHT_ARROW, prod[1],prod[2]))
+					fhandle.write( "%e %s %s %s %s \n" % ( p, prod[0], RIGHT_ARROW, prod[1],prod[2]))
 
 	def store_mjio(self, filename):
 		"""
@@ -111,7 +115,7 @@ class PCFG:
 	def rhs_index(self, terminal):
 		"""
 		Utility function that returns a list of all nonterminals that have a production
-		with this terminal on the lhs
+		with this terminal on its right hand side.
 		"""
 		return [ prod[0] for prod in self.productions if terminal in prod]
 
@@ -183,9 +187,61 @@ class PCFG:
 
 	
 	## Various properties of the PCFG that may be useful to compute.
+	def useful_information(self):
+		return [ 'Statistics of the final grammar',
+				'Actual expected length %f' % self.expected_length(),
+				'Derivational entropy %f' % self.derivational_entropy(),
+				'Derivational entropy (split) binary %f lexical %f ' % self.derivational_entropy_split(),
+				
+				'Lexical Ambiguity (entropy) %f' % self.compute_lexical_ambiguity()
+				]
 
-	def entropy_nonterminals(self):
-		# entropy of the productions.
+	def per_word_entropies(self):
+		"""
+		dict mapping each word to the entropy of the posterior distribution of nonterminals given 
+		terminals.
+		"""
+		result = defaultdict(float)
+		te = self.terminal_expectations()
+		pe = self.production_expectations()
+		for prod, e in pe.items():
+			if len(prod) == 2:
+				a = prod[1]
+				# posterior 
+				p = e/te[a]
+				result[a] -= p * math.log(p)
+		return result
+
+	def entropy_unigram(self):
+		"""
+		Entropy of the unigram distribution: compute exactly.
+		"""
+		te = self.terminal_expectations()
+		L = self.expected_length()
+		e = 0.0
+		for a in te.values():
+			p = a/L
+			e -= p * math.log(p)
+		return e
+
+	def entropy_preterminal(self):
+		"""
+		Entropy of the preterminal distribution.
+		"""
+		prode = self.production_expectations()
+		preterminalexpectations = defaultdict(float)
+		for prod,e in prode.items():
+			if len(prod) == 2:
+				preterminalexpectations[prod[0]] += e
+		l = self.expected_length()
+		e = 0.0
+		for a in preterminalexpectations.values():
+			p = a/l
+			e -= p * math.log(p)
+		return e
+
+	def entropy_conditional_nonterminals(self):
+		# entropy of the conditional productions.
 		e = defaultdict(float)
 		for prod in self.productions:
 			p = self.parameters[prod]
@@ -197,10 +253,37 @@ class PCFG:
 		"""
 		entropy of the distribution over derivation trees.
 		"""
-		nt_entropies = self.entropy_nonterminals()
+		nt_entropies = self.entropy_conditional_nonterminals()
 		nt_expectations = self.nonterminal_expectations()
 		return sum([ nt_entropies[nt] * nt_expectations[nt] for nt in self.nonterminals])
  
+	def derivational_entropy_split(self):
+		"""
+		Retun binary and lexical entropies which sum to the derivational entropy.
+		"""
+		lexical_totals = self.sum_lexical_probs()
+		
+		bentropies = 0.0
+		lentropies = 0.0
+		nt_expectations = self.nonterminal_expectations()
+		for nt, p in lexical_totals.items():
+			bentropies -= nt_expectations[nt] *p  * math.log(p)
+		for prod, alpha in self.parameters.items():
+			if len(prod) == 2:
+				p = alpha / lexical_totals[prod[0]]
+				lentropies -= nt_expectations[prod[0]] * alpha * math.log(p)
+			else:
+				bentropies -= nt_expectations[prod[0]] * alpha * math.log(alpha)
+		return (bentropies,lentropies)
+
+	def sum_lexical_probs(self):
+		sums = defaultdict(float)
+		for prod, alpha in self.parameters.items():
+			if len(prod) == 2:
+				sums[prod[0]] += alpha
+		return sums
+
+
 	def monte_carlo_entropy(self, n):
 		"""
 		Use a Monte Carlo approximation; return string entropy, unlabeled entropy and derivation entropy.
@@ -222,20 +305,40 @@ class PCFG:
 		return string_entropy/n, unlabeled_tree_entropy/n, labeled_tree_entropy/n
 
 
-	def estimate_ambiguity(self, samples = 1000):
+	def compute_lexical_ambiguity(self):
+		"""
+		Conditional entropy in nats of the preterminal given the terminal.
+		Note that even if the grammar is unambiguous, this can be greater than zero.
+
+		"""
+		l = self.expected_length()
+		te = self.terminal_expectations()
+		pe = self.production_expectations()
+		ce = 0.0
+		for prod, e in pe.items():
+			if len(prod) ==2:
+				le = te[prod[1]]
+				ce -= (e/l) * math.log( e/le)
+		return ce
+
+	def estimate_ambiguity(self, samples = 1000, max_length=100):
 		"""
 		Monte Carlo estimate of the conditional entropy H(tree|string)
 		"""
 		mysampler = Sampler(self)
 		insider = inside.InsideComputation(self)
 		total = 0.0
+		n = 0.0
 		for i in range(samples):
 			tree = mysampler.sample_tree()
 			s = collect_yield(tree)
+			if len(s) > max_length:
+				continue
 			lp = insider.inside_log_probability(s)
 			lpd = self.log_probability_derivation(tree)
 			total += lp - lpd
-		return total/samples
+			n += 1
+		return total/n
 		
 	def partition_nonterminals(self):
 		"""
