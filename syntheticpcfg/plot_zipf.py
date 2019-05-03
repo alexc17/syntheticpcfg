@@ -2,6 +2,8 @@
 import matplotlib
 matplotlib.use('Agg')
 
+import math
+
 import argparse
 import pcfg
 from collections import Counter
@@ -14,7 +16,7 @@ import matplotlib.patches as mpatches
 import os.path
 import numpy as np
 
-alpha = 1.0
+#alpha = 1.0
 
 def sample1(sampler, samples):
 	mcte = Counter()
@@ -65,26 +67,30 @@ def plot_te(te):
 	frequencies = counts[xindices]/ float(total)
 	return ranks, frequencies
 
-def make_rank_frequency(mypcfg, prng, samples, filename, corpus):
-	print("Making true lexical rank frequency plots")
-	te = mypcfg.terminal_expectations()
-	ranks,frequencies = plot_te(te)
-	plt.plot(ranks, frequencies, "b", rasterized=True,label="Exact from grammar")
-	# mcte = Counter()
+def make_rank_frequency(mypcfgs, prng, samples, filename, corpus):
+	
+	alpha = 1.0/math.sqrt(len(mypcfgs))
+	for mypcfg in mypcfgs:
+		te = mypcfg.terminal_expectations()
+		ranks,frequencies = plot_te(te)
+		plt.plot(ranks, frequencies, "b", alpha = alpha,rasterized=True)
+		# mcte = Counter()
 	if args.corpus:
 		ranks,frequencies = plotcorpus(args.corpus)
-	else:
-		mysampler = pcfg.Sampler(mypcfg, random=prng)
+	# else:
+	# 	mysampler = pcfg.Sampler(mypcfg, random=prng)
 		# for i in range(samples):
 		# 	tree = mysampler.sample_tree()
 		# 	# defatul is string.
 		# 	s = utility.collect_yield(tree)
 		# 	for a in s:
 		# 		mcte[a] += 1
-		ranks,frequencies = plot2(mysampler, samples)
-	plt.plot(ranks, frequencies, ".r", alpha = alpha, rasterized=True,label="Corpus")
-		
-	plt.legend()
+		# ranks,frequencies = plot2(mysampler, samples)
+		plt.plot(ranks, frequencies, ".r",  alpha=0.3, rasterized=True)
+	red_patch = mpatches.Patch(color='red', label='Corpus')
+	blue_patch = mpatches.Patch(color='blue', label='Grammar')
+	plt.legend(handles=[ blue_patch, red_patch])
+
 	plt.yscale('log')
 	plt.xscale('log')
 	plt.xlabel('Rank')
@@ -95,9 +101,9 @@ def make_rank_frequency(mypcfg, prng, samples, filename, corpus):
 	plt.close()
 
 if __name__ == '__main__':
-	parser = argparse.ArgumentParser(description='Make unigram rank frequency plot for a  PCFG')
-	parser.add_argument("inputfilename", help="File where the given PCFG is.")
-	parser.add_argument("outputfilename", help="File where the PDF will be saved.")
+	parser = argparse.ArgumentParser(description='Make unigram rank frequency plot for a group of PCFGs, and optionally plot the same for a sampled corpus.')
+	parser.add_argument("inputfilenames", help="File where the given PCFG is.", nargs='+',)
+	parser.add_argument("--outputpdf", help="File where the PDF will be saved.", default="zipf.pdf")
 	parser.add_argument("--seed",help="Choose random seed",type=int)
 	parser.add_argument("--alpha",help="Transparency",default=0.1,type=float)
 	
@@ -105,13 +111,14 @@ if __name__ == '__main__':
 	
 	parser.add_argument("--samples", type=int, default=100000,help="Number of samples, (default 10000)")
 	args = parser.parse_args()
-
-	mypcfg = pcfg.load_pcfg_from_file(args.inputfilename)
+	print(args.inputfilenames)
+	mypcfgs = [ pcfg.load_pcfg_from_file(f) for f in args.inputfilenames]
+#	mypcfg = pcfg.load_pcfg_from_file(args.inputfilename)
 	if args.seed:
 		print("Setting seed to ",args.seed)
 		prng = RandomState(args.seed)
 	else:
 		prng = RandomState()
 	alpha = args.alpha
-	make_rank_frequency(mypcfg, prng, args.samples, args.outputfilename,args.corpus)
+	make_rank_frequency(mypcfgs, prng, args.samples, args.outputpdf,args.corpus)
 
