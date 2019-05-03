@@ -13,41 +13,64 @@ import pcfgfactory
 import pcfg
 import utility
 import inside
+import collections
 
 parser = argparse.ArgumentParser(description='Compute the expected length distribution of a given PCFG')
 
-parser.add_argument("inputfilename", help="File where the given PCFG is.")
-parser.add_argument("--maxlength", help="limit samples to this length",type=int,default=30)
-parser.add_argument("--pdf", help="Save a diagram as a pdf")
+parser.add_argument("inputfilenames", help="Files where the given PCFGs are.",nargs="+")
+parser.add_argument("--corpus", help="Plot empirical length distribution of a corpus: filename")
+parser.add_argument("--maxlength", help="limit samples to this length",type=int,default=20)
+parser.add_argument("--pdf", help="Location of output file pdf, default length.pdf", default="length.pdf")
+parser.add_argument("--logscale", help="Y axis in log scale",action="store_true")
 ## Other options: control output format, what probs are calculated.
 
 
 args = parser.parse_args()
+l = args.maxlength + 1
+x = np.arange(1, l)
+ys = []
+for f in args.inputfilenames:
+	mypcfg = pcfg.load_pcfg_from_file(f)
+	print(f)
+	upcfg = mypcfg.make_unary()
 
-mypcfg = pcfg.load_pcfg_from_file(args.inputfilename)
-upcfg = mypcfg.make_unary()
-insider = inside.InsideComputation(upcfg)
-res = 1.0
-x = np.arange(1, args.maxlength + 1)
-y = np.zeros(args.maxlength)
+	insider = inside.UnaryInside(upcfg)
+	table = insider.compute_inside_smart(l)
+	start = insider.start
+	y = np.zeros(args.maxlength)
 
-for length in range(1,args.maxlength + 1):
-	s = (pcfg.UNARY_SYMBOL,) * length
-	lp = insider.inside_log_probability(s)
-	p = math.exp(lp)
-	y[length-1] = p
-	print(length,lp,p)
-	res -= math.exp(lp)
-print(">" + str(args.maxlength),math.log(res),res)
-#print(x,y)
-if args.pdf:
+	for length in range(1,l):
+			
+		p = table[length,start]
+		print(length,p)
+		y[length-1] = p
+	ys.append(y)
 
-	plt.plot(x, y, label="Grammar")
-	
-	plt.legend()
-	plt.xlabel('Length')
-	plt.ylabel('Probability')
+alpha = 1.0/math.sqrt(len(ys))
+for y in ys:
+	plt.plot(x, y, 'b',alpha=alpha)
 
-	plt.title("Length distribution")
-	plt.savefig(args.pdf)
-	plt.close()
+if args.corpus:
+	y = np.zeros(args.maxlength)
+	N = 0
+	with open(args.corpus,'r') as inc:
+		for line in inc:
+			ll = len(line.split())
+			if ll < l and ll > 0:
+				y[ll-1] +=1
+				N += 1
+	print(y,N)
+	plt.plot(x, y/N, 'r')
+
+if args.corpus:
+	red_patch = mpatches.Patch(color='red', label='Corpus')
+	blue_patch = mpatches.Patch(color='blue', label='Grammar')
+	plt.legend(handles=[ blue_patch, red_patch])
+if args.logscale:
+	plt.yscale('log')
+plt.xlabel('Length')
+plt.ylabel('Probability')
+
+plt.title("Length distribution")
+plt.savefig(args.pdf)
+plt.close()
