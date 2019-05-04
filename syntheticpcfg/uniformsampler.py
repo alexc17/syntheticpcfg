@@ -3,7 +3,7 @@
 import collections
 import numpy as np
 import numpy.random
-import random
+#import random
 
 
 import cfg 
@@ -16,10 +16,11 @@ class UniformSampler:
 	Stores data structures that contain counts and indices.
 	"""
 
-	def __init__(self, grammar, max_length):
+	def __init__(self, grammar, max_length,rng):
 		#print "Initialising uniform sampler"
 		# map from nonterminals to vectors of the number of derivations of each length.
 		self.index = {}
+		self.rng = rng
 		self.grammar = grammar
 		self.L = max_length + 1
 		self.vocab = len(grammar.terminals)
@@ -67,7 +68,7 @@ class UniformSampler:
 		n = 0
 		parser = inside.InsideComputation(self.grammar)
 		for i in range(samples):
-			s = tuple([ numpy.random.choice(terminals) for x in range(length) ])
+			s = tuple([ self.rng.choice(terminals) for x in range(length) ])
 			if parser.count_parses(s) > 0:
 				n += 1
 		return n/float(samples)
@@ -148,7 +149,7 @@ class UniformSampler:
 		total = self.index[nonterminal][length]
 		if total == 0.0:
 			raise ValueError("Sampling from empty " + nonterminal + " " + str(length))
-		r = random.randrange(total)
+		r = self.rng.random_sample() * total
 		for prod in self.prodindex[nonterminal]:
 			r -= self.index[prod][length]
 			if r < 0.0:
@@ -172,7 +173,7 @@ class UniformSampler:
 		total = self.index[production][length]
 		if total == 0.0:
 			raise ValueError("Sampling from empty")
-		r = random.randrange(total)
+		r = self.rng.random_sample() * total
 		for i in range(length ):
 			j = length - i
 			value = self.index[one][i] * self.index[two][j] 

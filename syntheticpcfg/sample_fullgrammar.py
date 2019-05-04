@@ -24,7 +24,7 @@ parser = argparse.ArgumentParser(description="""Create a randomly generated PCFG
 parser.add_argument("outputfilename", help="File where the resulting PCFG will be stored")
 parser.add_argument("--numbergrammars", help="Number of grammars to generate", default=1,type=int)
 
-parser.add_argument("--terminals", help="Number of terminals.", default=10000,type=int)
+parser.add_argument("--terminals", help="Number of terminals.", default=20000,type=int)
 parser.add_argument("--nonterminals", help="Number of nonterminals", default=10,type=int)
 
 parser.add_argument("--seed",help="Choose random seed",type=int)
@@ -35,7 +35,7 @@ parser.add_argument("--pitmanyor",help="Use Pitman Yor process for lexical probs
 parser.add_argument("--pitmanyora",help="PitmanYor a parameter",type=float,default=0.5)
 parser.add_argument("--pitmanyorb",help="PitmanYor b parameter",type=float,default=0.5)
 parser.add_argument("--lognormal",help="Use LogNormal prior for lexical probs",action="store_true")
-parser.add_argument("--sigma",help="Standard deviation for LogNormal prior",type=float,default=3.0)
+parser.add_argument("--sigma",help="Standard deviation for LogNormal prior",type=float,default=4.0)
 parser.add_argument("--dirichletlexical",help="Set Dirichlet for lexical probs",type=float,default=-1.0)
 
 parser.add_argument("--dirichletbinary",help="Set Dirichlet for binary probs (default is (|V-1|^2 + 1)^-1 )",type=float,default=-1.0)

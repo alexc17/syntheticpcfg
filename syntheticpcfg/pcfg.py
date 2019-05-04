@@ -284,14 +284,15 @@ class PCFG:
 		return sums
 
 
-	def monte_carlo_entropy(self, n):
+	def monte_carlo_entropy(self, n, sampler = None):
 		"""
 		Use a Monte Carlo approximation; return string entropy, unlabeled entropy and derivation entropy.
 		"""
 		string_entropy=0
 		unlabeled_tree_entropy = 0
 		labeled_tree_entropy = 0
-		sampler = Sampler(self)
+		if sampler == None:
+			sampler = Sampler(self)
 		insidec = inside.InsideComputation(self)
 		for i in range(n):
 			tree = sampler.sample_tree()
@@ -321,11 +322,14 @@ class PCFG:
 				ce -= (e/l) * math.log( e/le)
 		return ce
 
-	def estimate_ambiguity(self, samples = 1000, max_length=100):
+	def estimate_ambiguity(self, samples = 1000, max_length=100, sampler = None):
 		"""
 		Monte Carlo estimate of the conditional entropy H(tree|string)
 		"""
-		mysampler = Sampler(self)
+		if sampler==None:
+			mysampler = Sampler(self)
+		else:
+			mysampler = sampler
 		insider = inside.InsideComputation(self)
 		total = 0.0
 		n = 0.0
@@ -339,7 +343,32 @@ class PCFG:
 			total += lp - lpd
 			n += 1
 		return total/n
-		
+	
+	def estimate_communicability(self, samples = 1000, max_length=100, sampler = None):
+		"""
+		Returns two estimates of the communicability; The second one is I think better in most cases.
+		"""
+		if sampler==None:
+			mysampler = Sampler(self)
+		else:
+			mysampler = sampler
+		insider = inside.InsideComputation(self)
+		same = 0.0
+		ratio = 0.0
+		n = 0
+		for i in range(samples):
+			t = sampler.sample_tree()
+			s =collect_yield(t)
+			if len(s) <= max_length:
+				n += 1
+				mapt = insider.viterbi_parse(s)
+				if t == mapt:
+					same += 1
+				lpd = self.log_probability_derivation(mapt)
+				lps = insider.inside_log_probability(s)
+				ratio += math.exp(lpd - lps)
+		return ( same/n, ratio/n)
+
 	def partition_nonterminals(self):
 		"""
 		Partition the sets of nonterminals into sets of mutually recursive nonterminals.
