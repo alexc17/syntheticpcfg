@@ -28,7 +28,7 @@ for a,e in te.items():
 	if e * L > args.threshold:
 		newterminals.add(a)
 
-unk_probs = { nt:0 for nt in original.terminals }
+unk_probs = { nt:0 for nt in original.nonterminals }
 
 newproductions  = []
 newparameters = {}
@@ -54,7 +54,7 @@ original.terminals = newterminals
 original.productions = newproductions
 original.parameters = newparameters
 
-original.store(args.outputfilename,header=[  "Unkified with symbol %s, threshold %e" % (args.unk,args,threshold)])
+original.store(args.outputfilename,header=[  "Unkified with symbol %s, threshold %e" % (args.unk,args.threshold)])
 
 
 
