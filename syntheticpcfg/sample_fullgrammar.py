@@ -71,7 +71,7 @@ factory = pcfgfactory.FullPCFGFactory(nonterminals = args.nonterminals, terminal
 header = [ "Nonterminals %d Terminals %d " % (args.nonterminals,args.terminals)]
 if args.seed:
 	random.seed(args.seed)
-	numpy.random(args.seed)
+	numpy.random.seed(args.seed)
 
 	header.append("Random seed %d" % args.seed)
 

@@ -76,7 +76,7 @@ header = [ "Nonterminals %d terminals %d binary_rules %d lexical_rules % d" % (a
 
 if args.seed:
 	random.seed(args.seed)
-	numpy.random(args.seed)
+	numpy.random.seed(args.seed)
 	header.append("Random seed is %d " % args.seed)
 if args.nonstrictcnf:
 	factory.cfgfactory.strict_cnf = False
@@ -121,8 +121,8 @@ while n < args.numbergrammars:
 		if args.numbergrammars > 1:
 			fn = args.outputfilename % (n)
 			header.append( "slice %d" % n)
-			pcfg.store(fn)
-			print("Stored",fn, header = header)
+			pcfg.store(fn,header = header)
+			print("Stored",fn, header)
 		else:
 			pcfg.store(args.outputfilename, header = header)
 	except utility.ParseFailureException:

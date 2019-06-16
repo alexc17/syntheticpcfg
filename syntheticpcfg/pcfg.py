@@ -259,7 +259,7 @@ class PCFG:
  
 	def derivational_entropy_split(self):
 		"""
-		Retun binary and lexical entropies which sum to the derivational entropy.
+		Rerun binary and lexical entropies which sum to the derivational entropy.
 		"""
 		lexical_totals = self.sum_lexical_probs()
 		
@@ -549,6 +549,27 @@ class PCFG:
 			newz[nt] += lprodmap[nt]
 		return newz
 
+
+	def approximate_kernel(self):
+		"""
+		return a map from nonterminals to (a, p) pairs
+		where a is a terminal and p is the posterior probability.
+		"""
+		pe = self.production_expectations()
+		te = self.terminal_expectations()
+		result = {}
+		for prod, e in pe.items():
+			if len(prod) == 2:
+				nt,a = prod
+				posteriora = e/te[a]
+				if nt in result:
+					(b,posteriorb) = result[nt]
+					if posteriora > posteriorb:
+						result[nt] = (a,posteriora)
+				else:
+					result[nt] = (a,posteriora)
+		return result
+
 	def oracle_fkp1(self):
 		"""
 		Return a list of terminals that characterise the nonterminals,
@@ -783,7 +804,12 @@ class Sampler:
 		if random == None:
 			random = numpy.random.RandomState()
 		assert pcfg.is_normalised()
-		self.multinomials = { nt: Multinomial(pcfg,nt, cache_size,random) for nt in pcfg.nonterminals}
+
+
+		## For reproducibility we need to have a fixed order.
+		nts = list(pcfg.nonterminals)
+		nts.sort()
+		self.multinomials = { nt: Multinomial(pcfg,nt, cache_size,random) for nt in nts}
 		self.start = pcfg.start
 		self.max_depth = max_depth
 		self.insider = inside.InsideComputation(pcfg)

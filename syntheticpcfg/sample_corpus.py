@@ -14,7 +14,7 @@ import sys
 
 if sys.version_info[0] < 3:
     raise Exception("Python 3 or a more recent version is required.")
-    
+
 parser = argparse.ArgumentParser(description="""Sample from a given PCFG.
 
  default gives three log probabilities and a tree. 
