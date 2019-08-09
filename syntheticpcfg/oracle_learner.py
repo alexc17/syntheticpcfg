@@ -5,6 +5,7 @@ import utility
 import inside
 import pcfg
 import logging
+import argparse
 
 from utility import ParseFailureException
 from collections import Counter
@@ -267,4 +268,21 @@ class OracleLearner:
 	
 
 
+if __name__ == '__main__':
+	print("Running oracle learner.")
+
+	parser = argparse.ArgumentParser(description='Replace low probability tokens with an UNK token for a given PCFG')
+
+	parser.add_argument("inputfilename", help="File where the original PCFG is.")
+	parser.add_argument("outputfilename", help="File where the resulting WCFG will be stored.")
+
+
+	parser.add_argument("--samples", help="Number of samples to take", default=10000,type=int)
+
+	# parser.add_argument("--unk", help="Symbol to use, default UNK", default="UNK")
+	args = parser.parse_args()
+
+	original = pcfg.load_pcfg_from_file(args.inputfilename)
+	insider = inside.InsideComputation(original)
+	
 
