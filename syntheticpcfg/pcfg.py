@@ -75,6 +75,7 @@ class PCFG:
 		"""
 		Store this to a file.
 		"""
+		self.productions.sort()
 		with open(filename,'w') as fhandle:
 			if len(header) > 0:
 				for line in header:

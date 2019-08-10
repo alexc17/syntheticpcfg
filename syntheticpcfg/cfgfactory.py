@@ -22,6 +22,7 @@ class CFGFactory:
 
 	def sample_full(self):
 		lexicon = list(utility.generate_lexicon(self.number_terminals))
+
 		nonterminals = self.generate_nonterminals()
 		lprods = set()
 		bprods= set()
@@ -46,6 +47,7 @@ class CFGFactory:
 		If empty, raise an exception.
 		"""
 		my_cfg = self.sample_raw()
+		#print([ prod for prod in my_cfg.productions if len(prod) == 2 and prod[0] == 'S'])
 		logging.info("CFG nominally has %d nonterminals, %d terminals, %d binary_rules and %d lexical rules", self.number_nonterminals,self.number_terminals,self.binary_rules,self.lexical_rules)
 		ts = my_cfg.compute_trim_set()
 		if len(ts) == 0:
@@ -77,20 +79,28 @@ class CFGFactory:
 		return a CFG
 		"""
 		lexicon = list(utility.generate_lexicon(self.number_terminals))
+		#DEBUGGING
+		lexicon.sort()
+		print(lexicon[0],lexicon[-1])
 		nonterminals = self.generate_nonterminals()
 		lprods = set()
 		bprods= set()
+		lexicon_size = len(lexicon)
 		while len(lprods) < self.lexical_rules:
 			lhs = numpy.random.choice(nonterminals)
-			rhs = lexicon[numpy.random.choice(range(len(lexicon)))]
+			rhs = lexicon[numpy.random.choice(range(lexicon_size))]
+			
 			lprods.add( (lhs,rhs))
+		print(lhs,rhs)
 		while len(bprods) < self.binary_rules:
 			if self.strict_cnf:
 				a =  numpy.random.choice(nonterminals)
 				b,c = numpy.random.choice(nonterminals[1:],size=2)
 			else:
 				a,b,c = numpy.random.choice(nonterminals,size=3)
+			
 			bprods.add( (a,b,c))	
+		print(a,b,c)
 		my_cfg = cfg.CFG()
 		my_cfg.start = nonterminals[0]
 		my_cfg.nonterminals = set(nonterminals)

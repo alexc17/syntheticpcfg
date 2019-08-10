@@ -9,48 +9,48 @@ import utility
 
 from collections import Counter
 
-parser = argparse.ArgumentParser(description='Sample N trees from a PCFG and return the ML estimate based on those trees.')
+parser = argparse.ArgumentParser(description='remove all low expectation productions and renormalise.')
 
 parser.add_argument("inputfilename", help="File where the original PCFG is.")
 parser.add_argument("outputfilename", help="File where the resulting PCFG will be stored.")
 
-parser.add_argument("--samples", help="Number of samples (default 10000)", default=10000,type=int)
-parser.add_argument("--seed", help="Random seed", default=None,type=int)
-
+parser.add_argument("--eproduction", help="threshold of expectation for a production (default 1e-5)", default=1e-5,type=float)
+parser.add_argument("--enonterminal", help="threshold of expectation for a Nonterminal (default 1e-4)", default=1e-4,type=float)
 
 
 args = parser.parse_args()
 
+enonterminal = args.enonterminal
+eproduction = args.eproduction
 
-if args.seed:
-	print("Setting seed to ",args.seed)
-	prng = RandomState(args.seed)
-else:
-	prng = RandomState()
-
-
+assert enonterminal < 1.0
+assert eproduction < enonterminal
 
 
 original = pcfg.load_pcfg_from_file(args.inputfilename)
 
-mysampler = pcfg.Sampler(original, random=prng)
-counter = Counter()
-
-for _ in range(args.samples):
-	tree = mysampler.sample_tree()
-	utility.count_productions(tree, counter)
 
 ml = pcfg.PCFG()
+pe = original.production_expectations()
+nte = original.nonterminal_expectations()
+ml.nonterminals = set(nt for nt,e in nte.items() if e > enonterminal)
+ml.start = original.start
+assert ml.start in ml.nonterminals
 
-for production,n in counter.items():
-	ml.productions.append(production)
-	ml.nonterminals.add(production[0])
-	if len(production) == 2:
-		ml.terminals.add(production[1])
-	ml.parameters[production] = float(n)
+ml.productions = [prod for prod,e in pe.items() if e > eproduction and prod[0] in ml.nonterminals]
+finalnts = set( prod[0] for prod in ml.productions)
+assert len(finalnts) == len(ml.nonterminals)
+rhs = set()
+for prod in ml.productions:
+	if len(prod) == 3:
+		rhs.add(prod[1])
+		rhs.add(prod[2])
+assert len(rhs) + 1 == len(ml.nonterminals)
 
+ml.terminals = set(prod[1] for prod in ml.productions if len(prod) == 2 )
+ml.parameters = { prod : original.parameters[prod] for prod in ml.productions }
 ml.normalise()
-ml.store(args.outputfilename,header=[  "Resampled from %d samples" % args.samples])
+ml.store(args.outputfilename,header=[  "Pruned with  %e, %e threshold " % (enonterminal,eproduction)])
 
 
 

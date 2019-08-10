@@ -237,7 +237,9 @@ class FullPCFGFactory:
 		## Number of productions.
 		nb = (self.nonterminals - 1) **2
 		parameters = {}
-		unary_terminal = list(mycfg.terminals)[0]
+		terminals = list(mycfg.terminals)
+		terminals.sort()
+		unary_terminal = terminals[0]
 
 		for a in mycfg.nonterminals:
 			
@@ -284,7 +286,7 @@ class FullPCFGFactory:
 		final_pcfg.nonterminals = unary_pcfg.nonterminals
 		final_pcfg.start = unary_pcfg.start
 		final_pcfg.terminals = list(utility.generate_lexicon(self.terminals))
-		
+		final_pcfg.terminals.sort()
 		for prod in unary_pcfg.productions:
 			alpha = unary_pcfg.parameters[prod]
 			if len(prod) == 3:
@@ -294,6 +296,7 @@ class FullPCFGFactory:
 			else:
 				## sample conditional probs of binary.
 				lprobs = self.lexical_distribution.sample(self.terminals)
+				print(lprobs[0])
 				for i,a in enumerate(final_pcfg.terminals):
 					newprod = (prod[0],a)
 					newalpha = alpha * lprobs[i]
@@ -400,7 +403,8 @@ class PCFGFactory:
 		unary_pcfg.nonterminals = set(cfg.nonterminals)
 		productions = set()
 		lexical_index = defaultdict(list)
-		for prod in cfg.productions:
+		sorted_prods = sorted(list(cfg.productions))
+		for prod in sorted_prods:
 			if len(prod) == 3:
 				productions.add(prod)
 			else:
@@ -438,13 +442,16 @@ class PCFGFactory:
 		unary_pcfg.trim_zeros()
 		final_pcfg = pcfg.PCFG()
 		#print("nonterminals", unary_pcfg.nonterminals)
-		for nt in lexical_index:
+		## Nondeterminism hee
+		sorted_nonterminals = list(cfg.nonterminals)
+		sorted_nonterminals.sort()
+		for nt in sorted_nonterminals:
 
 			if (nt,unary) in unary_pcfg.parameters:
 				totalp = unary_pcfg.parameters[(nt,unary)]
 				k = len(lexical_index[nt])
 				probs = self.lexical_distribution.sample(k)
-				#print(nt,probs,k,totalp,unary)
+				print(nt,probs[0],k,totalp,lexical_index[nt][0])
 				assert(len(probs) == k)
 				for a,p  in zip(lexical_index[nt],probs):
 					prod = (nt,a)

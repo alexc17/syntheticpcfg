@@ -48,8 +48,15 @@ parser.add_argument("--length_em_max_length",help="Maximum length of strings to 
 parser.add_argument("--length_em_termination_kld",help="Threshold for terminating training of length distribution; default (0.05)",type=float,default=0.5)
 
 
-
+header = []
 args = parser.parse_args()
+
+
+if args.seed:
+	random.seed(args.seed)
+	numpy.random.seed(args.seed)
+	header.append("Random seed is %d " % args.seed)
+
 pcfgfactory.LENGTH_EM_ITERATIONS = args.length_em_iterations
 pcfgfactory.LENGTH_EM_MAX_LENGTH = args.length_em_max_length
 pcfgfactory.TERMINATION_KLD = args.length_em_termination_kld
@@ -64,6 +71,7 @@ if args.binaryproductions < nts:
 
 factory = pcfgfactory.PCFGFactory()
 
+print(utility.generateRandomString(10))
 ## Configure factory
 
 factory.cfgfactory.number_nonterminals = args.nonterminals
@@ -71,13 +79,8 @@ factory.cfgfactory.number_terminals = args.terminals
 factory.cfgfactory.binary_rules = args.binaryproductions
 factory.cfgfactory.lexical_rules = args.lexicalproductions
 
-header = [ "Nonterminals %d terminals %d binary_rules %d lexical_rules % d" % (args.nonterminals,args.terminals, args.binaryproductions, args.lexicalproductions) ]
+header.append( "Nonterminals %d terminals %d binary_rules %d lexical_rules % d" % (args.nonterminals,args.terminals, args.binaryproductions, args.lexicalproductions) )
 
-
-if args.seed:
-	random.seed(args.seed)
-	numpy.random.seed(args.seed)
-	header.append("Random seed is %d " % args.seed)
 if args.nonstrictcnf:
 	factory.cfgfactory.strict_cnf = False
 	header.append("S allowed on RHS of productions.")
@@ -117,7 +120,7 @@ while n < args.numbergrammars:
 	try:
 		pcfg = factory.sample()
 		n += 1
-		header.extend(pcfg.useful_information())
+		#header.extend(pcfg.useful_information())
 		if args.numbergrammars > 1:
 			fn = args.outputfilename % (n)
 			header.append( "slice %d" % n)
