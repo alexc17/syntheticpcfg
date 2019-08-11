@@ -35,6 +35,7 @@ parser.add_argument("--poisson", type=float, default=5.0, help="Use Zero truncat
 parser.add_argument("--nonstrictcnf", help="Allow start symbol to occur on right hand side of production.", action="store_true")
 
 parser.add_argument("--corpuslength", help="Use distribution of lengths from a chosen corpus. Filename of corpus.")
+parser.add_argument("--verbose",help="Choose random seed",action="store_true")
 
 # Parameters for training length distribution
 LENGTH_EM_ITERATIONS = 10
@@ -51,6 +52,8 @@ parser.add_argument("--length_em_termination_kld",help="Threshold for terminatin
 header = []
 args = parser.parse_args()
 
+if args.verbose:
+	logging.basicConfig(level=logging.INFO)
 
 if args.seed:
 	random.seed(args.seed)
@@ -71,7 +74,7 @@ if args.binaryproductions < nts:
 
 factory = pcfgfactory.PCFGFactory()
 
-print(utility.generateRandomString(10))
+#print(utility.generateRandomString(10))
 ## Configure factory
 
 factory.cfgfactory.number_nonterminals = args.nonterminals
@@ -123,7 +126,10 @@ while n < args.numbergrammars:
 		#header.extend(pcfg.useful_information())
 		if args.numbergrammars > 1:
 			fn = args.outputfilename % (n)
-			header.append( "slice %d" % n)
+			if n == 1:
+				header.append( "slice %d" % n)
+			else:
+				header[-1]  = "slice %d" % n
 			pcfg.store(fn,header = header)
 			print("Stored",fn, header)
 		else:

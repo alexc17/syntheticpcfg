@@ -264,7 +264,7 @@ def generate_lexicon(n):
 	""" Generate a list of n tokens that can be used to be 
 	words in a synthetic example"""
 	
-	length = int(math.ceil(math.log10(n)))
+	length = max(1,int(math.ceil(math.log10(n))))
 	dictionary = set()
 	count = 0
 	while len(dictionary) < n :

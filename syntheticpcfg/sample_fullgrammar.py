@@ -8,6 +8,10 @@ import pcfg
 import utility
 import logging
 
+# set from command line flag
+
+
+
 parser = argparse.ArgumentParser(description="""Create a randomly generated PCFG, 
 	with a trivial CFG backbone -- i.e. all  possible rules in CNF.
 
@@ -28,7 +32,7 @@ parser.add_argument("--terminals", help="Number of terminals.", default=20000,ty
 parser.add_argument("--nonterminals", help="Number of nonterminals", default=10,type=int)
 
 parser.add_argument("--seed",help="Choose random seed",type=int)
-
+parser.add_argument("--verbose",help="Choose random seed",action="store_true")
 
 ## Lexical options
 parser.add_argument("--pitmanyor",help="Use Pitman Yor process for lexical probs",action="store_true")
@@ -61,19 +65,21 @@ parser.add_argument("--length_em_termination_kld",help="Threshold for terminatin
 
 args = parser.parse_args()
 
+if args.verbose:
+	logging.basicConfig(level=logging.INFO)
 pcfgfactory.LENGTH_EM_ITERATIONS = args.length_em_iterations
 pcfgfactory.LENGTH_EM_MAX_LENGTH = args.length_em_max_length
 pcfgfactory.TERMINATION_KLD = args.length_em_termination_kld
 
 
-factory = pcfgfactory.FullPCFGFactory(nonterminals = args.nonterminals, terminals = args.terminals)
-
 header = [ "Nonterminals %d Terminals %d " % (args.nonterminals,args.terminals)]
 if args.seed:
 	random.seed(args.seed)
 	numpy.random.seed(args.seed)
-
+	logging.info("setting seed to %d" % args.seed)
 	header.append("Random seed %d" % args.seed)
+
+factory = pcfgfactory.FullPCFGFactory(nonterminals = args.nonterminals, terminals = args.terminals)
 
 if args.pitmanyor:
 	factory.lexical_distribution = pcfgfactory.StickBreakingPrior(a=args.pitmanyora,b=args.pitmanyorb)

@@ -22,7 +22,7 @@ class CFGFactory:
 
 	def sample_full(self):
 		lexicon = list(utility.generate_lexicon(self.number_terminals))
-
+		#print("Lexicon",lexicon,self.number_terminals)
 		nonterminals = self.generate_nonterminals()
 		lprods = set()
 		bprods= set()
@@ -38,6 +38,7 @@ class CFGFactory:
 		my_cfg.nonterminals = set(nonterminals)
 		my_cfg.terminals = set(lexicon)
 		my_cfg.productions = lprods | bprods
+		#print(my_cfg.terminals)
 		return my_cfg
 
 	def sample_trim(self):
