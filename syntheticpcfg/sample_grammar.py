@@ -35,7 +35,7 @@ parser.add_argument("--poisson", type=float, default=5.0, help="Use Zero truncat
 parser.add_argument("--nonstrictcnf", help="Allow start symbol to occur on right hand side of production.", action="store_true")
 
 parser.add_argument("--corpuslength", help="Use distribution of lengths from a chosen corpus. Filename of corpus.")
-parser.add_argument("--verbose",help="Choose random seed",action="store_true")
+parser.add_argument("--verbose",help="Print useful information",action="store_true")
 
 # Parameters for training length distribution
 LENGTH_EM_ITERATIONS = 10

@@ -32,7 +32,7 @@ parser.add_argument("--terminals", help="Number of terminals.", default=20000,ty
 parser.add_argument("--nonterminals", help="Number of nonterminals", default=10,type=int)
 
 parser.add_argument("--seed",help="Choose random seed",type=int)
-parser.add_argument("--verbose",help="Choose random seed",action="store_true")
+parser.add_argument("--verbose",help="Print useful information",action="store_true")
 
 ## Lexical options
 parser.add_argument("--pitmanyor",help="Use Pitman Yor process for lexical probs",action="store_true")
