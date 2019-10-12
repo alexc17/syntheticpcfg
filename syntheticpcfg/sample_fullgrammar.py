@@ -50,6 +50,10 @@ parser.add_argument("--wsjlength", help="Use distribution of lengths from corpus
 parser.add_argument("--poisson", type=float, default=5.0, help="Use Zero truncated poisson.")
 parser.add_argument("--corpuslength", help="Use distribution of lengths from a chosen corpus. Filename of corpus.")
 
+
+parser.add_argument("--uniform", help="Not a full grammar but one sampled uniformly from all grammars.", action="store_true")
+
+
 # Parameters for training length distribution
 LENGTH_EM_ITERATIONS = 10
 LENGTH_EM_MAX_LENGTH = 20
@@ -122,11 +126,18 @@ if args.numbergrammars > 1:
 n = 0
 while n < args.numbergrammars:
 	try:
-		pcfg = factory.sample_smart()
+		if args.uniform:
+			pcfg = factory.sample_uniform()
+		else:
+			logging.info("Sampling ..")
+			pcfg = factory.sample_smart()
 		n += 1
 		if args.numbergrammars > 1:
 			fn = args.outputfilename % (n)
-			header.append("Slice %d" % n)
+			if n > 0:
+				header[-1] = ("Slice %d" % n)
+			else:
+				header.append("Slice %d" % n)
 			pcfg.store(fn,header=header)
 			logging.info("Stored",fn)
 		else:

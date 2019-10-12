@@ -224,6 +224,105 @@ class FullPCFGFactory:
 		## Default is symmetric dirichlet 1.
 		self.lexical_distribution = LexicalDirichlet()
 		self.binary_distribution = LexicalDirichlet()
+		
+
+	def sample_uniform(self):
+		"""
+		Sample uniformly. 
+		Then train.
+		Then resample.
+		"""
+		logging.info("Sampling uniform cfg")
+		self.cfgfactory.number_terminals = 1
+		lp = 1 - (0.5 ** self.terminals)
+		logging.info("Lexical pron for sampling is %e" % lp)
+		mycfg = self.cfgfactory.sample_uniform(lp = lp,bp = 0.5)
+		logging.info("Sampled unary cfg")
+		## Number of productions.
+		
+		parameters = {}
+		terminals = list(mycfg.terminals)
+		unary_terminal = terminals[0]
+		snt = list(mycfg.nonterminals)
+		snt.sort()
+		prods = list(mycfg.productions)
+		prods.sort()
+		nbs = Counter()
+		for p in prods:
+			if len(p) == 3:
+				nbs[p[0]] += 1
+		for a in snt:
+			
+			unary_prob = numpy.random.random()
+			logging.info("Unary probs %s %f" % (a,unary_prob))
+			#print(lprobs.shape)
+			#for i,prod in enumerate([ prod for prod in mycfg.productions if len(prod) == 2 and prod[0] == a]):
+			parameters[ (a,unary_terminal)] = unary_prob
+
+			probs = self.binary_distribution.sample(nbs[a])
+			#print(probs[0])
+			for i,prod in enumerate([ prod for prod in prods if len(prod) == 3 and prod[0] == a]):
+				parameters[prod] = (1-unary_prob) * probs[i]
+				
+		unary_pcfg = pcfg.PCFG(cfg=mycfg)
+		unary_pcfg.parameters = parameters
+		## Ok we may get an error if we don't trim zeros (with very small concentration parameters)
+		unary_pcfg.trim_zeros()
+		unary_pcfg.set_log_parameters()
+
+		## Now we have a unary grammar we train it.
+		logging.info("Training with LENGTH_EM_MAX_LENGTH %d ", LENGTH_EM_MAX_LENGTH)
+		#return unary_pcfg
+		targetlp = self.length_distribution.ml_lp(LENGTH_EM_MAX_LENGTH)
+		valid_target = self.length_distribution.ml_lp_general(LENGTH_EM_MAX_LENGTH)
+		logging.info("Target LP = %f, %f", targetlp, valid_target)
+		ui = inside.UnaryInside(unary_pcfg)
+		logging.info("Entropy = %f",unary_pcfg.derivational_entropy())
+		for i in range(LENGTH_EM_ITERATIONS):
+			logging.info("Starting EM iteration %d, target = %f ", i,targetlp)
+			lp,kld = ui.train_once_smart(self.length_distribution.weights, LENGTH_EM_MAX_LENGTH)
+			delta = abs(lp - targetlp)
+			logging.info("KLD from target %f", kld)
+			if kld< TERMINATION_KLD:
+				logging.info("Converged enough.  %f < %f ",  kld , TERMINATION_KLD)
+				break
+		else:
+			logging.warning("Reached maximum number of iterations without reaching convergence threshold. Final KLD is %f.",kld)
+			
+		
+		unary_pcfg.parameters = ui.get_params()
+		unary_pcfg.trim_zeros()
+		#logging.info("1,1,1 param %e" % unary_pcfg.parameters[("NT1","NT1","NT1")])
+		## Now we have a unary grammar, with the right parameters.
+		logging.info("Entropy = %f",unary_pcfg.derivational_entropy())
+		final_pcfg = pcfg.PCFG()
+		final_pcfg.nonterminals = unary_pcfg.nonterminals
+		final_pcfg.start = unary_pcfg.start
+		final_pcfg.terminals = list(utility.generate_lexicon(self.terminals))
+		final_pcfg.terminals.sort()
+		logging.info("Terminals from %s to %s" % (final_pcfg.terminals[0],final_pcfg.terminals[-1]))
+
+		## Now sample the lexical prods 
+		lbs = Counter()
+		for prod,alpha in unary_pcfg.parameters.items():
+			if len(prod) == 3:
+				final_pcfg.productions.append(prod)
+				final_pcfg.parameters[prod] = alpha
+			else:
+				## It's a unary rule
+				## so we sample one uniformly from the terminals and then flip a coin for the rest.
+				initial = numpy.random.choice(self.terminals)
+				lps = []
+				for i,a in enumerate(final_pcfg.terminals):
+					if numpy.random.random()< 0.5 or i == initial:
+						newprod = (prod[0],a)
+						final_pcfg.productions.append(newprod)
+						lps.append(newprod)
+				lprobs = self.lexical_distribution.sample(len(lps))
+				for i,newprod in enumerate(lps):
+					final_pcfg.parameters[newprod] = alpha * lprobs[i]
+		final_pcfg.set_log_parameters()
+		return final_pcfg
 
 	def sample_smart(self):
 		"""
@@ -285,7 +384,7 @@ class FullPCFGFactory:
 		
 		unary_pcfg.parameters = ui.get_params()
 		unary_pcfg.trim_zeros()
-		logging.info("1,1,1 param %e" % unary_pcfg.parameters[("NT1","NT1","NT1")])
+		#logging.info("1,1,1 param %e" % unary_pcfg.parameters[("NT1","NT1","NT1")])
 		## Now we have a unary grammar, with the right parameters.
 		logging.info("Entropy = %f",unary_pcfg.derivational_entropy())
 		final_pcfg = pcfg.PCFG()
@@ -294,8 +393,7 @@ class FullPCFGFactory:
 		final_pcfg.terminals = list(utility.generate_lexicon(self.terminals))
 		final_pcfg.terminals.sort()
 		logging.info("Terminals from %s to %s" % (final_pcfg.terminals[0],final_pcfg.terminals[-1]))
-		for prod in prods:
-			alpha = unary_pcfg.parameters[prod]
+		for prod,alpha  in unary_pcfg.parameters.items():
 			if len(prod) == 3:
 				if alpha > 0:
 					final_pcfg.productions.append(prod)
