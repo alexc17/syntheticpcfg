@@ -139,7 +139,7 @@ while n < args.numbergrammars:
 			else:
 				header.append("Slice %d" % n)
 			pcfg.store(fn,header=header)
-			logging.info("Stored",fn)
+			logging.info("Stored %s" % fn)
 		else:
 			pcfg.store(args.outputfilename,header=header)
 	except utility.ParseFailureException:
