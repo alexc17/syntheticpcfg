@@ -440,7 +440,9 @@ class PCFG:
 			#print(x)
 			y = f(x)
 			#print(y)
-			x1 =  x - np.dot(np.linalg.inv(J(x)),y)
+			# Use solve instead of inv for numerical stability
+			delta = np.linalg.solve(J(x), y)
+			x1 = x - delta
 			if numpy.linalg.norm(x - x1, 1) < PARTITION_FUNCTION_EPSILON:
 				return { nt : x[ntindex[nt]] for nt in self.nonterminals}
 			x = x1
@@ -504,9 +506,8 @@ class PCFG:
 				transitionMatrix[lhs,index[prod[2]]] += alpha
 		
 		#print(transitionMatrix)
-		#r2 = numpy.linalg.inv(np.eye(n) - transitionMatrix)
-		#print(r2)
-		result = np.dot(numpy.linalg.inv(np.eye(n) - transitionMatrix),transitionMatrix)
+		# Use solve instead of inv for numerical stability: solve (I-T)x = T
+		result = np.linalg.solve(np.eye(n) - transitionMatrix, transitionMatrix)
 		si = index[self.start]
 		resultD = { nt : result[si, index[nt]] for nt in self.nonterminals}
 		resultD[self.start] += 1
@@ -536,8 +537,8 @@ class PCFG:
 				transitionMatrix[lhs,index[prod[2]]] += alpha
 
 		
-		# n = o * (1- t)^-1
-		result = np.dot(numpy.linalg.inv(np.eye(n) - transitionMatrix),outputMatrix)
+		# Use solve instead of inv for numerical stability: solve (I-T)x = O
+		result = np.linalg.solve(np.eye(n) - transitionMatrix, outputMatrix)
 		return result
 		
 	def _compute_one_step_partition(self, z, bprods,lprodmap):
