@@ -3,18 +3,18 @@ import matplotlib
 matplotlib.use('Agg')
 
 import math
-
 import argparse
-import pcfg
+import os.path
 from collections import Counter
-from numpy.random import RandomState
-import utility
-import numpy.random
 
+import numpy as np
+import numpy.random
+from numpy.random import RandomState
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-import os.path
-import numpy as np
+
+from . import pcfg
+from . import utility
 
 #alpha = 1.0
 

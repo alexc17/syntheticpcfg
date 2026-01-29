@@ -3,11 +3,10 @@
 import argparse
 import random
 import numpy.random
-
-import pcfg
-import utility
-
 from collections import Counter
+
+from . import pcfg
+from . import utility
 
 parser = argparse.ArgumentParser(description='remove all low expectation productions and renormalise.')
 

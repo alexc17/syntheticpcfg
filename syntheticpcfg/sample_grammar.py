@@ -2,10 +2,12 @@
 
 import argparse
 import random
+import logging
 import numpy.random
-import pcfgfactory
-import pcfg
-import utility
+
+from . import pcfgfactory
+from . import pcfg
+from . import utility
 
 parser = argparse.ArgumentParser(description='Create a randomly generated PCFG')
 

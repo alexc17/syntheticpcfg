@@ -10,10 +10,10 @@ import numpy as np
 import numpy.random
 from collections import Counter, defaultdict
 
-import utility
-import cfg
-import pcfg
-import inside
+from . import utility
+from . import cfg
+from . import pcfg
+from . import inside
 
 
 # =============================================================================
@@ -123,13 +123,17 @@ def unary_pcfg():
 @pytest.fixture
 def loaded_pcfg():
     """Load a PCFG from the example file."""
-    return pcfg.load_pcfg_from_file("../data/manual/example1.pcfg")
+    import os
+    test_dir = os.path.dirname(os.path.abspath(__file__))
+    return pcfg.load_pcfg_from_file(os.path.join(test_dir, "../data/manual/example1.pcfg"))
 
 
 @pytest.fixture
 def dyck2_pcfg():
     """Load the Dyck-2 grammar."""
-    return pcfg.load_pcfg_from_file("../data/manual/dyck2.pcfg")
+    import os
+    test_dir = os.path.dirname(os.path.abspath(__file__))
+    return pcfg.load_pcfg_from_file(os.path.join(test_dir, "../data/manual/dyck2.pcfg"))
 
 
 # =============================================================================
@@ -1283,7 +1287,7 @@ class TestPCFGFactory:
 
     def test_lognormal_prior(self):
         """Test LogNormalPrior sampling."""
-        from pcfgfactory import LogNormalPrior
+        from .pcfgfactory import LogNormalPrior
         
         prior = LogNormalPrior(sigma=1.0)
         sample = prior.sample(100)
@@ -1294,7 +1298,7 @@ class TestPCFGFactory:
 
     def test_lexical_dirichlet(self):
         """Test LexicalDirichlet sampling."""
-        from pcfgfactory import LexicalDirichlet
+        from .pcfgfactory import LexicalDirichlet
         
         ld = LexicalDirichlet(dirichlet=1.0)
         sample = ld.sample(50)
@@ -1304,7 +1308,7 @@ class TestPCFGFactory:
 
     def test_length_distribution_poisson(self):
         """Test Poisson length distribution."""
-        from pcfgfactory import LengthDistribution
+        from .pcfgfactory import LengthDistribution
         
         ld = LengthDistribution()
         ld.set_poisson(5.0, 20)
@@ -1315,7 +1319,7 @@ class TestPCFGFactory:
 
     def test_stick_breaking(self):
         """Test stick-breaking process."""
-        from pcfgfactory import sample_stick_py
+        from .pcfgfactory import sample_stick_py
         
         np.random.seed(42)
         sample = sample_stick_py(0.5, 1.0, 10)
@@ -1462,6 +1466,107 @@ class TestEdgeCases:
         
         # Should hit max depth sometimes with 90% recursion probability
         assert errors > 0
+
+
+# =============================================================================
+# Bug detection tests - these should fail before fixes are applied
+# =============================================================================
+
+class TestBugDetection:
+    """Tests that expose bugs in the codebase."""
+
+    def test_cfg_load_from_file_iterates_correctly(self, tmp_path):
+        """
+        Bug: cfg.load_from_file iterates over filename string instead of file handle.
+        Line 28: 'for line in filename:' should be 'for line in inf:'
+        """
+        # Create a test CFG file
+        cfg_file = tmp_path / "test.cfg"
+        cfg_file.write_text("S -> a\nS -> S S\n")
+        
+        # This should load the grammar, not iterate over filename characters
+        grammar = cfg.load_from_file(str(cfg_file))
+        
+        assert "S" in grammar.nonterminals
+        assert len(grammar.productions) == 2
+
+    def test_cfg_load_from_file_uses_correct_variable(self, tmp_path):
+        """
+        Bug: cfg.load_from_file uses undefined 'nonterminals' instead of 'grammar.nonterminals'.
+        Line 51: 'assert not a in nonterminals' should be 'assert not a in grammar.nonterminals'
+        """
+        cfg_file = tmp_path / "test.cfg"
+        cfg_file.write_text("S -> a\n")
+        
+        # Should not raise NameError
+        grammar = cfg.load_from_file(str(cfg_file))
+        assert "a" in grammar.terminals
+
+    def test_cfg_compute_usable_productions_handles_binary(self):
+        """
+        Bug: cfg.compute_usable_productions accesses prod[2] without checking len(prod) == 3.
+        Line 123: Missing condition check.
+        """
+        mycfg = cfg.CFG()
+        mycfg.start = "S"
+        mycfg.nonterminals = {"S", "A"}
+        mycfg.terminals = {"a"}
+        mycfg.productions = {
+            ("S", "a"),      # lexical - len 2
+            ("S", "A", "A"), # binary - len 3
+            ("A", "a"),
+        }
+        
+        trim_set = {"S", "A"}
+        # Should not raise IndexError
+        usable = mycfg.compute_usable_productions(trim_set)
+        assert len(usable) >= 2
+
+    def test_pcfg_store_mjio_uses_tuple_indexing(self, simple_pcfg, tmp_path):
+        """
+        Bug: pcfg.store_mjio uses 'prod.lhs' instead of 'prod[0]'.
+        Line 113: Productions are tuples, not objects with .lhs attribute.
+        """
+        filepath = tmp_path / "test_mjio.pcfg"
+        
+        # Should not raise AttributeError
+        simple_pcfg.store_mjio(str(filepath))
+        
+        # File should exist and have content
+        assert filepath.exists()
+        content = filepath.read_text()
+        assert len(content) > 0
+
+    def test_uniformsampler_get_shortest_yields_uses_correct_attrs(self):
+        """
+        Bug: UniformSampler.get_shortest_yields uses self.nonterminals (doesn't exist)
+        and 'nonterminal' variable (undefined, should be 'nt').
+        Lines 117-122 have multiple issues.
+        """
+        from .uniformsampler import UniformSampler
+        
+        # Create a simple grammar
+        mycfg = cfg.CFG()
+        mycfg.start = "S"
+        mycfg.nonterminals = {"S"}
+        mycfg.terminals = {"a"}
+        mycfg.productions = {("S", "a")}
+        
+        # Create a simple PCFG for the InsideComputation
+        mypcfg = pcfg.PCFG()
+        mypcfg.start = "S"
+        mypcfg.nonterminals = {"S"}
+        mypcfg.terminals = {"a"}
+        mypcfg.productions = [("S", "a")]
+        mypcfg.parameters = {("S", "a"): 1.0}
+        mypcfg.set_log_parameters()
+        
+        rng = numpy.random.RandomState(42)
+        sampler = UniformSampler(mypcfg, max_length=5, rng=rng)
+        
+        # Should not raise AttributeError
+        yields = sampler.get_shortest_yields()
+        assert "S" in yields
 
 
 if __name__ == "__main__":

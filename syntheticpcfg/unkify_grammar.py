@@ -3,9 +3,10 @@
 import argparse
 import random
 import numpy.random
-import pcfgfactory
-import pcfg
-import utility
+
+from . import pcfgfactory
+from . import pcfg
+from . import utility
 
 
 parser = argparse.ArgumentParser(description='Replace low probability tokens with an UNK token for a given PCFG')

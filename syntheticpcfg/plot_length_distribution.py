@@ -5,15 +5,17 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 import argparse
+import math
+import collections
+
+import numpy as np
 import numpy.random
 from numpy.random import RandomState
-import math
-import numpy as np
-import pcfgfactory
-import pcfg
-import utility
-import inside
-import collections
+
+from . import pcfgfactory
+from . import pcfg
+from . import utility
+from . import inside
 
 parser = argparse.ArgumentParser(description='Compute the expected length distribution of a given PCFG')
 

@@ -2,15 +2,14 @@
 
 
 import argparse
+import sys
 import numpy.random
 from numpy.random import RandomState
 
-import pcfgfactory
-import pcfg
-import utility
-import inside
-
-import sys
+from . import pcfgfactory
+from . import pcfg
+from . import utility
+from . import inside
 
 if sys.version_info[0] < 3:
     raise Exception("Python 3 or a more recent version is required.")

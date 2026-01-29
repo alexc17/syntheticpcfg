@@ -2,11 +2,12 @@
 
 import argparse
 import random
-import numpy.random
-import pcfgfactory
-import pcfg
-import utility
 import logging
+import numpy.random
+
+from . import pcfgfactory
+from . import pcfg
+from . import utility
 
 # set from command line flag
 
