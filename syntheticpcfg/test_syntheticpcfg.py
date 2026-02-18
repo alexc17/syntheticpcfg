@@ -1330,6 +1330,153 @@ class TestPCFGFactory:
         assert all(s >= 0 for s in sample)
 
 
+class TestReproducibility:
+    """Test that grammar generation is reproducible given fixed random seeds.
+
+    generate_lexicon uses Python's `random` module, while the factory
+    methods and Sampler use `numpy.random`.  Both must be seeded.
+    """
+
+    def _seed_all(self, seed):
+        import random as stdlib_random
+        stdlib_random.seed(seed)
+        numpy.random.seed(seed)
+
+    def _pcfgs_equal(self, g1, g2):
+        """Check two PCFGs are identical in structure and parameters."""
+        assert g1.start == g2.start
+        assert g1.nonterminals == g2.nonterminals
+        assert sorted(g1.terminals) == sorted(g2.terminals)
+        assert sorted(g1.productions) == sorted(g2.productions)
+        for prod in g1.productions:
+            assert g1.parameters[prod] == pytest.approx(
+                g2.parameters[prod], abs=1e-15), f"Parameter mismatch on {prod}"
+
+    def test_full_factory_naive_reproducible(self):
+        """FullPCFGFactory.sample_naive produces identical grammars from same seed."""
+        from .pcfgfactory import FullPCFGFactory
+
+        self._seed_all(123)
+        g1 = FullPCFGFactory(3, 10).sample_naive()
+
+        self._seed_all(123)
+        g2 = FullPCFGFactory(3, 10).sample_naive()
+
+        self._pcfgs_equal(g1, g2)
+
+    def test_full_factory_smart_reproducible(self):
+        """FullPCFGFactory.sample_smart produces identical grammars from same seed."""
+        from .pcfgfactory import FullPCFGFactory
+
+        self._seed_all(77)
+        g1 = FullPCFGFactory(3, 10).sample_smart()
+
+        self._seed_all(77)
+        g2 = FullPCFGFactory(3, 10).sample_smart()
+
+        self._pcfgs_equal(g1, g2)
+
+    def test_full_factory_uniform_reproducible(self):
+        """FullPCFGFactory.sample_uniform produces identical grammars from same seed."""
+        from .pcfgfactory import FullPCFGFactory
+
+        self._seed_all(99)
+        g1 = FullPCFGFactory(3, 10).sample_uniform()
+
+        self._seed_all(99)
+        g2 = FullPCFGFactory(3, 10).sample_uniform()
+
+        self._pcfgs_equal(g1, g2)
+
+    def test_pcfg_factory_sample_reproducible(self):
+        """PCFGFactory.sample produces identical grammars from same seed."""
+        from .pcfgfactory import PCFGFactory
+
+        factory1 = PCFGFactory()
+        factory1.cfgfactory.number_nonterminals = 3
+        factory1.cfgfactory.number_terminals = 10
+        factory1.cfgfactory.binary_rules = 8
+        factory1.cfgfactory.lexical_rules = 15
+
+        factory2 = PCFGFactory()
+        factory2.cfgfactory.number_nonterminals = 3
+        factory2.cfgfactory.number_terminals = 10
+        factory2.cfgfactory.binary_rules = 8
+        factory2.cfgfactory.lexical_rules = 15
+
+        self._seed_all(55)
+        g1 = factory1.sample()
+
+        self._seed_all(55)
+        g2 = factory2.sample()
+
+        self._pcfgs_equal(g1, g2)
+
+    def test_pcfg_factory_naive_reproducible(self):
+        """PCFGFactory.sample_naive produces identical grammars from same seed."""
+        from .pcfgfactory import PCFGFactory
+
+        factory1 = PCFGFactory()
+        factory1.cfgfactory.number_nonterminals = 3
+        factory1.cfgfactory.number_terminals = 10
+        factory1.cfgfactory.binary_rules = 8
+        factory1.cfgfactory.lexical_rules = 15
+
+        factory2 = PCFGFactory()
+        factory2.cfgfactory.number_nonterminals = 3
+        factory2.cfgfactory.number_terminals = 10
+        factory2.cfgfactory.binary_rules = 8
+        factory2.cfgfactory.lexical_rules = 15
+
+        self._seed_all(42)
+        g1 = factory1.sample_naive()
+
+        self._seed_all(42)
+        g2 = factory2.sample_naive()
+
+        self._pcfgs_equal(g1, g2)
+
+    def test_different_seeds_differ(self):
+        """Different seeds should produce different grammars."""
+        from .pcfgfactory import FullPCFGFactory
+
+        self._seed_all(1)
+        g1 = FullPCFGFactory(3, 10).sample_naive()
+
+        self._seed_all(2)
+        g2 = FullPCFGFactory(3, 10).sample_naive()
+
+        params_differ = any(
+            g1.parameters.get(p, 0) != g2.parameters.get(p, 0)
+            for p in set(g1.parameters) | set(g2.parameters)
+        )
+        assert params_differ
+
+    def test_sampling_from_grammar_reproducible(self, simple_pcfg):
+        """Sampling trees/strings from a fixed grammar is reproducible."""
+        rng1 = numpy.random.RandomState(42)
+        sampler1 = pcfg.Sampler(simple_pcfg, random=rng1)
+        trees1 = [sampler1.sample_tree() for _ in range(20)]
+
+        rng2 = numpy.random.RandomState(42)
+        sampler2 = pcfg.Sampler(simple_pcfg, random=rng2)
+        trees2 = [sampler2.sample_tree() for _ in range(20)]
+
+        assert trees1 == trees2
+
+    def test_generated_grammar_is_valid(self):
+        """Generated grammars should be normalized and have finite expected length."""
+        from .pcfgfactory import FullPCFGFactory
+
+        self._seed_all(314)
+        g = FullPCFGFactory(4, 20).sample_naive()
+
+        assert g.is_normalised()
+        assert len(g.nonterminals) > 0
+        assert len(g.terminals) > 0
+        assert len(g.productions) > 0
+
+
 # =============================================================================
 # Integration tests
 # =============================================================================
