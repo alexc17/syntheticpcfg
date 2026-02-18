@@ -287,24 +287,25 @@ class PCFG:
 
     def monte_carlo_entropy(self, n, sampler = None):
         """
-        Use a Monte Carlo approximation; return string entropy, unlabeled entropy and derivation entropy.
+        Use a Monte Carlo approximation; return string entropy, unlabeled tree entropy
+        and derivation (labeled tree) entropy.
         """
         string_entropy=0
         unlabeled_tree_entropy = 0
-        labeled_tree_entropy = 0
-        if sampler == None:
+        derivation_entropy = 0
+        if sampler is None:
             sampler = Sampler(self)
         insidec = inside.InsideComputation(self)
         for i in range(n):
             tree = sampler.sample_tree()
-            lp1 = self.log_probability_derivation(tree)
+            lp_derivation = self.log_probability_derivation(tree)
             sentence = collect_yield(tree)
-            lp2 = insidec.inside_bracketed_log_probability(tree)
-            lp3 = insidec.inside_log_probability(sentence)
-            string_entropy -= lp1
-            unlabeled_tree_entropy -= lp2
-            labeled_tree_entropy -= lp3
-        return string_entropy/n, unlabeled_tree_entropy/n, labeled_tree_entropy/n
+            lp_unlabeled = insidec.inside_bracketed_log_probability(tree)
+            lp_string = insidec.inside_log_probability(sentence)
+            string_entropy -= lp_string
+            unlabeled_tree_entropy -= lp_unlabeled
+            derivation_entropy -= lp_derivation
+        return string_entropy/n, unlabeled_tree_entropy/n, derivation_entropy/n
 
 
     def compute_lexical_ambiguity(self):
@@ -349,7 +350,7 @@ class PCFG:
         """
         Returns two estimates of the communicability; The second one is I think better in most cases.
         """
-        if sampler==None:
+        if sampler is None:
             mysampler = Sampler(self)
         else:
             mysampler = sampler
@@ -358,7 +359,7 @@ class PCFG:
         ratio = 0.0
         n = 0
         for i in range(samples):
-            t = sampler.sample_tree()
+            t = mysampler.sample_tree()
             s =collect_yield(t)
             if len(s) <= max_length:
                 n += 1
@@ -374,7 +375,7 @@ class PCFG:
         """
         Partition the sets of nonterminals into sets of mutually recursive nonterminals.
         """
-        graph = defaultdict(list)
+        graph = {nt: [] for nt in self.nonterminals}
         for prod in self.productions:
             if len(prod) == 3:
                 for i in [1,2]:
@@ -437,14 +438,15 @@ class PCFG:
             return J
 
         for i in range(PARTITION_FUNCTION_MAX_ITERATIONS):
-            #print(x)
             y = f(x)
-            #print(y)
-            # Use solve instead of inv for numerical stability
-            delta = np.linalg.solve(J(x), y)
-            x1 = x - delta
+            Jx = J(x)
+            try:
+                delta = np.linalg.solve(Jx, y)
+            except np.linalg.LinAlgError:
+                delta, _, _, _ = np.linalg.lstsq(Jx, y, rcond=None)
+            x1 = np.clip(x - delta, 0.0, 1.0)
             if numpy.linalg.norm(x - x1, 1) < PARTITION_FUNCTION_EPSILON:
-                return { nt : x[ntindex[nt]] for nt in self.nonterminals}
+                return { nt : x1[ntindex[nt]] for nt in self.nonterminals}
             x = x1
         raise ValueError("failed to converge")
         
@@ -491,12 +493,14 @@ class PCFG:
         """
         Compute the expected number of times each nonterminal will be used in a given derivation.
         return a dict mapping nonterminals to non-negative reals.
+
+        Solves e_S^T (I - T)^{-1} via the transposed system (I - T)^T v = e_S
+        rather than inverting the full matrix. Falls back to least-squares
+        when the system is singular (critical grammars).
         """
         n = len(self.nonterminals)
         transitionMatrix = np.zeros([n,n])
-        #outputMatrix = np.zeros(n)
         ntlist = list(self.nonterminals)
-        #print(ntlist)
         index = { nt:i for i,nt in enumerate(ntlist)}
         for prod in self.productions:
             alpha = self.parameters[prod]
@@ -504,19 +508,25 @@ class PCFG:
             if len(prod) == 3:
                 transitionMatrix[lhs,index[prod[1]]] += alpha
                 transitionMatrix[lhs,index[prod[2]]] += alpha
-        
-        #print(transitionMatrix)
-        # Use solve instead of inv for numerical stability: solve (I-T)x = T
-        result = np.linalg.solve(np.eye(n) - transitionMatrix, transitionMatrix)
+
+        A = (np.eye(n) - transitionMatrix).T
         si = index[self.start]
-        resultD = { nt : result[si, index[nt]] for nt in self.nonterminals}
-        resultD[self.start] += 1
+        e_s = np.zeros(n)
+        e_s[si] = 1.0
+        try:
+            v = np.linalg.solve(A, e_s)
+        except np.linalg.LinAlgError:
+            v, _, _, _ = np.linalg.lstsq(A, e_s, rcond=None)
+        resultD = { nt : v[index[nt]] for nt in self.nonterminals}
         return resultD
 
     def expected_lengths(self):
         """
         Compute the expected length of a string generated by each nonterminal.
         Assume that the grammar is consistent.
+
+        Solves (I - T) x = O.  Falls back to least-squares when the
+        system is singular (critical grammars).
         """
         n = len(self.nonterminals)
         m = len(self.terminals)
@@ -525,8 +535,6 @@ class PCFG:
         outputMatrix = np.zeros([n,m])
         index = {nt : i for i,nt in enumerate(ntlist)}
         terminalIndex = { a: i for i,a in enumerate(list(self.terminals))}
-        # each element stores the expected number of times that 
-        # nonterminal will generate another nonterminal in a single derivation.
         for prod in self.productions:
             alpha = self.parameters[prod]
             lhs = index[prod[0]]
@@ -536,9 +544,11 @@ class PCFG:
                 transitionMatrix[lhs,index[prod[1]]] += alpha
                 transitionMatrix[lhs,index[prod[2]]] += alpha
 
-        
-        # Use solve instead of inv for numerical stability: solve (I-T)x = O
-        result = np.linalg.solve(np.eye(n) - transitionMatrix, outputMatrix)
+        A = np.eye(n) - transitionMatrix
+        try:
+            result = np.linalg.solve(A, outputMatrix)
+        except np.linalg.LinAlgError:
+            result, _, _, _ = np.linalg.lstsq(A, outputMatrix, rcond=None)
         return result
         
     def _compute_one_step_partition(self, z, bprods,lprodmap):

@@ -26,7 +26,7 @@ te = original.terminal_expectations()
 L = original.expected_length()
 
 for a,e in te.items():
-	if e * L > args.threshold:
+	if e / L > args.threshold:
 		newterminals.add(a)
 
 unk_probs = { nt:0 for nt in original.nonterminals }

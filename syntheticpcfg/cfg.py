@@ -20,6 +20,7 @@ def convert_pcfg_to_cfg(pcfg, discard_zero = True):
             assert A in my_cfg.nonterminals
             assert B in my_cfg.nonterminals
             assert C in my_cfg.nonterminals
+    return my_cfg
 
 def load_from_file(filename):
     grammar = CFG()

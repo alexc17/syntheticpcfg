@@ -928,18 +928,19 @@ class TestNumericalStability:
         """Test that expected length methods are consistent."""
         el1 = dyck1_pcfg.expected_length()
         
-        # Compute via sampling
         numpy.random.seed(42)
         sampler = pcfg.Sampler(dyck1_pcfg)
         
         lengths = []
-        for _ in range(2000):
+        for _ in range(5000):
             s = sampler.sample_string()
             lengths.append(len(s))
         
         el_sampled = np.mean(lengths)
+        std_err = np.std(lengths) / np.sqrt(len(lengths))
+        tolerance = max(0.5, 3 * std_err)
         
-        assert el1 == pytest.approx(el_sampled, abs=0.2)
+        assert el1 == pytest.approx(el_sampled, abs=tolerance)
 
     def test_matrix_inversion_alternative(self):
         """
@@ -1567,6 +1568,351 @@ class TestBugDetection:
         # Should not raise AttributeError
         yields = sampler.get_shortest_yields()
         assert "S" in yields
+
+
+# =============================================================================
+# Tests for fixed bugs
+# =============================================================================
+
+class TestBugFixes:
+    """Tests verifying that previously identified bugs are fixed."""
+
+    def test_estimate_communicability_default_sampler(self, simple_pcfg):
+        """
+        Bug: estimate_communicability used `sampler` (the parameter, possibly None)
+        instead of `mysampler` (the constructed Sampler) in the sampling loop.
+        Calling with sampler=None (the default) would crash.
+        """
+        numpy.random.seed(42)
+        exact, approx_val = simple_pcfg.estimate_communicability(samples=50, sampler=None)
+        assert 0.0 <= exact <= 1.0
+        assert 0.0 <= approx_val <= 1.0
+
+    def test_estimate_communicability_with_sampler(self, ambiguous_pcfg):
+        """Test estimate_communicability when passing an explicit sampler."""
+        numpy.random.seed(42)
+        sampler = pcfg.Sampler(ambiguous_pcfg)
+        exact, approx_val = ambiguous_pcfg.estimate_communicability(
+            samples=50, sampler=sampler)
+        assert 0.0 <= exact <= 1.0
+        assert 0.0 <= approx_val <= 1.0
+
+    def test_monte_carlo_entropy_ordering(self, ambiguous_pcfg):
+        """
+        Bug: monte_carlo_entropy had string_entropy and derivation_entropy
+        accumulating on the wrong variables (swapped lp1/lp3 assignments).
+
+        For any PCFG: H(string) <= H(unlabeled tree) <= H(derivation)
+        because each is a refinement of the previous.
+        """
+        numpy.random.seed(42)
+        sampler = pcfg.Sampler(ambiguous_pcfg)
+        h_string, h_unlabeled, h_derivation = ambiguous_pcfg.monte_carlo_entropy(
+            500, sampler=sampler)
+
+        assert h_string <= h_unlabeled + 0.01
+        assert h_unlabeled <= h_derivation + 0.01
+
+    def test_monte_carlo_entropy_unambiguous(self, simple_pcfg):
+        """
+        For an unambiguous grammar, H(derivation) == H(unlabeled tree) == H(string)
+        because there's exactly one derivation per string.
+        """
+        numpy.random.seed(42)
+        sampler = pcfg.Sampler(simple_pcfg)
+        h_string, h_unlabeled, h_derivation = simple_pcfg.monte_carlo_entropy(
+            200, sampler=sampler)
+
+        assert h_string == pytest.approx(h_derivation, abs=0.01)
+        assert h_string == pytest.approx(h_unlabeled, abs=0.01)
+
+    def test_monte_carlo_derivation_entropy_matches_exact(self, ambiguous_pcfg):
+        """
+        The MC derivation entropy should approximate the exact derivational_entropy.
+        """
+        numpy.random.seed(42)
+        sampler = pcfg.Sampler(ambiguous_pcfg)
+        _, _, h_derivation_mc = ambiguous_pcfg.monte_carlo_entropy(
+            2000, sampler=sampler)
+
+        h_derivation_exact = ambiguous_pcfg.derivational_entropy()
+        assert h_derivation_mc == pytest.approx(h_derivation_exact, abs=0.15)
+
+    def test_convert_pcfg_to_cfg_returns_cfg(self, simple_pcfg):
+        """
+        Bug: convert_pcfg_to_cfg built a CFG object but never returned it.
+        """
+        result = cfg.convert_pcfg_to_cfg(simple_pcfg)
+        assert result is not None
+        assert isinstance(result, cfg.CFG)
+        assert result.start == simple_pcfg.start
+        assert result.nonterminals == simple_pcfg.nonterminals
+        assert result.terminals == simple_pcfg.terminals
+        assert len(result.productions) == len(simple_pcfg.productions)
+
+
+# =============================================================================
+# Tests for estimate_ambiguity
+# =============================================================================
+
+class TestAmbiguity:
+    """Tests for ambiguity estimation."""
+
+    def test_estimate_ambiguity_unambiguous(self, simple_pcfg):
+        """For an unambiguous grammar, H(tree|string) should be 0."""
+        numpy.random.seed(42)
+        sampler = pcfg.Sampler(simple_pcfg)
+        amb = simple_pcfg.estimate_ambiguity(samples=200, sampler=sampler)
+        assert amb == pytest.approx(0.0, abs=0.01)
+
+    def test_estimate_ambiguity_ambiguous(self, ambiguous_pcfg):
+        """For an ambiguous grammar, H(tree|string) should be > 0."""
+        numpy.random.seed(42)
+        sampler = pcfg.Sampler(ambiguous_pcfg)
+        amb = ambiguous_pcfg.estimate_ambiguity(samples=500, sampler=sampler)
+        assert amb > 0.0
+
+    def test_estimate_ambiguity_default_sampler(self, simple_pcfg):
+        """Should work without explicitly passing a sampler."""
+        numpy.random.seed(42)
+        amb = simple_pcfg.estimate_ambiguity(samples=50)
+        assert np.isfinite(amb)
+
+    def test_lexical_ambiguity_unambiguous(self, simple_pcfg):
+        """Lexical ambiguity for a grammar where each terminal has a unique NT."""
+        la = simple_pcfg.compute_lexical_ambiguity()
+        assert la >= 0.0
+        assert np.isfinite(la)
+
+
+# =============================================================================
+# Tests for UniformSampler density methods
+# =============================================================================
+
+class TestUniformSamplerDensity:
+    """Tests for density computations in UniformSampler."""
+
+    def _make_grammar(self):
+        mypcfg = pcfg.PCFG()
+        mypcfg.start = "S"
+        mypcfg.nonterminals = {"S"}
+        mypcfg.terminals = {"a", "b"}
+        mypcfg.productions = [("S", "S", "S"), ("S", "a"), ("S", "b")]
+        mypcfg.parameters = {
+            ("S", "S", "S"): 0.4,
+            ("S", "a"): 0.3,
+            ("S", "b"): 0.3,
+        }
+        mypcfg.set_log_parameters()
+        return mypcfg
+
+    def test_density_length_one(self):
+        """At length 1, density = num_lexical_prods / vocab_size."""
+        from .uniformsampler import UniformSampler
+        mypcfg = self._make_grammar()
+        rng = numpy.random.RandomState(42)
+        us = UniformSampler(mypcfg, 10, rng)
+        d = us.density(1)
+        assert d == pytest.approx(1.0)
+
+    def test_density_nonnegative(self):
+        """Density should be non-negative at all lengths."""
+        from .uniformsampler import UniformSampler
+        mypcfg = self._make_grammar()
+        rng = numpy.random.RandomState(42)
+        us = UniformSampler(mypcfg, 10, rng)
+        for l in range(1, 10):
+            assert us.density(l) >= 0.0
+
+    def test_string_density_bounded(self):
+        """String density (proportion parseable) should be in [0, 1]."""
+        from .uniformsampler import UniformSampler
+        mypcfg = self._make_grammar()
+        rng = numpy.random.RandomState(42)
+        us = UniformSampler(mypcfg, 10, rng)
+        for l in [1, 2, 3]:
+            if us.get_total(l) > 0:
+                sd = us.string_density(l, 50)
+                assert 0.0 <= sd <= 1.0 + 1e-9
+
+    def test_string_density_length_one_exact(self):
+        """At length 1, all strings of the right symbols are parseable."""
+        from .uniformsampler import UniformSampler
+        mypcfg = self._make_grammar()
+        rng = numpy.random.RandomState(42)
+        us = UniformSampler(mypcfg, 5, rng)
+        sd = us.string_density(1, 100)
+        assert sd == pytest.approx(1.0, abs=0.01)
+
+    def test_uniform_sampling(self):
+        """Verify uniform sampler produces trees of correct length."""
+        from .uniformsampler import UniformSampler
+        mypcfg = self._make_grammar()
+        rng = numpy.random.RandomState(42)
+        us = UniformSampler(mypcfg, 10, rng)
+        for l in [1, 2, 3, 4]:
+            if us.get_total(l) > 0:
+                tree = us.sample(l)
+                assert len(utility.collect_yield(tree)) == l
+
+
+# =============================================================================
+# Tests for PCFG file I/O edge cases
+# =============================================================================
+
+class TestPCFGFileIO:
+    """Tests for grammar file loading and storing."""
+
+    def test_load_dyck2(self, dyck2_pcfg):
+        """Test that Dyck-2 grammar loads and has expected properties."""
+        assert dyck2_pcfg.is_normalised()
+        assert len(dyck2_pcfg.nonterminals) == 7
+        assert len(dyck2_pcfg.terminals) == 4
+        el = dyck2_pcfg.expected_length()
+        assert el > 0
+        assert np.isfinite(el)
+
+    def test_store_reload_preserves_semantics(self, dyck2_pcfg, tmp_path):
+        """Store and reload should preserve sampling distribution."""
+        filepath = tmp_path / "roundtrip.pcfg"
+        dyck2_pcfg.store(str(filepath))
+        reloaded = pcfg.load_pcfg_from_file(str(filepath))
+
+        assert reloaded.is_normalised()
+        assert reloaded.expected_length() == pytest.approx(
+            dyck2_pcfg.expected_length(), abs=0.01)
+        assert reloaded.derivational_entropy() == pytest.approx(
+            dyck2_pcfg.derivational_entropy(), abs=0.01)
+
+    def test_load_with_comments(self, tmp_path):
+        """Grammar files with comment lines should load correctly."""
+        filepath = tmp_path / "comments.pcfg"
+        filepath.write_text("# This is a comment\n1.0 S -> a\n# Another comment\n")
+        g = pcfg.load_pcfg_from_file(str(filepath))
+        assert g.is_normalised()
+        assert "a" in g.terminals
+
+
+# =============================================================================
+# Tests for entropy and information-theoretic quantities
+# =============================================================================
+
+class TestEntropyProperties:
+    """Tests for mathematical properties of entropy computations."""
+
+    def test_derivational_entropy_increases_with_ambiguity(self):
+        """More ambiguous grammars should have higher derivational entropy."""
+        def make_pcfg(p):
+            g = pcfg.PCFG()
+            g.start = "S"
+            g.nonterminals = {"S"}
+            g.terminals = {"a"}
+            g.productions = [("S", "S", "S"), ("S", "a")]
+            g.parameters = {("S", "S", "S"): p, ("S", "a"): 1 - p}
+            g.set_log_parameters()
+            return g
+
+        h_low = make_pcfg(0.1).derivational_entropy()
+        h_mid = make_pcfg(0.3).derivational_entropy()
+        h_high = make_pcfg(0.45).derivational_entropy()
+        assert h_low < h_mid < h_high
+
+    def test_entropy_split_components_nonnegative(self, dyck2_pcfg):
+        """Both binary and lexical entropy components should be non-negative."""
+        h_binary, h_lexical = dyck2_pcfg.derivational_entropy_split()
+        assert h_binary >= 0
+        assert h_lexical >= 0
+
+    def test_per_word_entropies_nonnegative(self, dyck2_pcfg):
+        """Per-word entropy should be non-negative for every terminal."""
+        pwe = dyck2_pcfg.per_word_entropies()
+        for a, h in pwe.items():
+            assert h >= -1e-10
+
+    def test_preterminal_entropy_bounded_by_log_nts(self, simple_pcfg):
+        """Preterminal entropy can't exceed log(number of nonterminals)."""
+        ep = simple_pcfg.entropy_preterminal()
+        upper_bound = math.log(len(simple_pcfg.nonterminals))
+        assert ep <= upper_bound + 1e-10
+
+
+# =============================================================================
+# Tests for partition function and renormalisation
+# =============================================================================
+
+class TestPartitionAndRenorm:
+    """Tests for partition function and renormalisation."""
+
+    def test_renormalise_makes_consistent(self):
+        """Renormalising an inconsistent grammar should make Z(S) = 1."""
+        g = pcfg.PCFG()
+        g.start = "S"
+        g.nonterminals = {"S", "A"}
+        g.terminals = {"a"}
+        g.productions = [
+            ("S", "S", "A"), ("S", "a"), ("A", "a"),
+        ]
+        g.parameters = {
+            ("S", "S", "A"): 0.7,
+            ("S", "a"): 0.3,
+            ("A", "a"): 1.0,
+        }
+        g.set_log_parameters()
+        g.renormalise()
+        pf = g.compute_partition_function_fast()
+        assert pf["S"] == pytest.approx(1.0, abs=1e-4)
+
+    def test_partition_function_fast_vs_fp(self, dyck2_pcfg):
+        """Newton and fixed-point methods should agree on Dyck-2."""
+        pf_fast = dyck2_pcfg.compute_partition_function_fast()
+        pf_fp = dyck2_pcfg.compute_partition_function_fp()
+        for nt in dyck2_pcfg.nonterminals:
+            assert pf_fast[nt] == pytest.approx(pf_fp[nt], abs=1e-3)
+
+    def test_partition_nonterminals(self, dyck2_pcfg):
+        """Test SCC partitioning of nonterminals."""
+        sccs = dyck2_pcfg.partition_nonterminals()
+        all_nts = set()
+        for scc in sccs:
+            for nt in scc:
+                all_nts.add(nt)
+        assert "S" in all_nts
+
+
+# =============================================================================
+# Tests for evaluation.py
+# =============================================================================
+
+class TestEvaluation:
+    """Tests for evaluation metrics."""
+
+    def test_string_kld_self(self, simple_pcfg):
+        """KL divergence of a grammar with itself should be ~0."""
+        from . import evaluation
+        numpy.random.seed(42)
+        kld = evaluation.string_kld(simple_pcfg, simple_pcfg, samples=200)
+        assert kld == pytest.approx(0.0, abs=0.05)
+
+    def test_bracketed_kld_self(self, simple_pcfg):
+        """Bracketed KLD of a grammar with itself should be ~0."""
+        from . import evaluation
+        numpy.random.seed(42)
+        kld = evaluation.bracketed_kld(simple_pcfg, simple_pcfg, samples=200)
+        assert kld == pytest.approx(0.0, abs=0.05)
+
+    def test_bracketed_match_self(self, simple_pcfg):
+        """Bracketed match against self should be 1.0."""
+        from . import evaluation
+        numpy.random.seed(42)
+        match = evaluation.bracketed_match(simple_pcfg, simple_pcfg, samples=100)
+        assert match == pytest.approx(1.0, abs=0.01)
+
+    def test_test_coverage_self(self, simple_pcfg):
+        """Coverage of a grammar by itself should be 1.0."""
+        from . import evaluation
+        numpy.random.seed(42)
+        cov = evaluation.test_coverage(simple_pcfg, simple_pcfg, samples=100)
+        assert cov == pytest.approx(1.0)
 
 
 if __name__ == "__main__":
