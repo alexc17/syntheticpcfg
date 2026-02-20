@@ -73,33 +73,34 @@ class UniformSampler:
                 n += 1
         return n/float(samples)
 
-    def string_density(self,length, samples):
+    def string_density(self,length, samples, parser=None):
         """
         return an estimate of the proportion of strings of length n that are in the grammar.
         Do this by sampling uniformly from the derivations, 
         and computing the number of derivations for each such string, and dividing.
+
+        If *parser* (an InsideComputation) is provided it will be reused,
+        avoiding the overhead of rebuilding indices on every call.
         """
         derivations = self.get_total(length)
 
         strings = 1.0 * self.vocab ** length
         total = 0.0
-        parser = inside.InsideComputation(self.grammar)
+        if parser is None:
+            parser = inside.InsideComputation(self.grammar)
         inverse = 0.0
         for i in range(samples):
 
             tree = self.sample(length)
             w = collect_yield(tree)
-            #print w
-            #print w
             
             n = parser.count_parses(w)
-            #print n
             if n == 0:
                 raise ValueError("Generated a string which cannot be parsed.")
             total += n
             inverse += 1.0/n
         imean = inverse /samples
-        return (derivations / strings) *  imean #, derivations, strings, 1.0/imean
+        return (derivations / strings) *  imean
 
 
     def get_total(self,length):

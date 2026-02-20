@@ -124,24 +124,42 @@ def robust_monte_carlo_entropy(mypcfg, insider_obj, sampler, n_samples):
     return string_e / n, unlabeled_e / n, derivation_e / n
 
 
-def compute_density_data(mypcfg, max_length, prng, density_samples):
+def compute_density_data(mypcfg, max_length, prng, density_samples,
+                         density_max_length=None, time_budget=60.0):
     """
     Use UniformSampler to compute:
-    - ambiguity ratio: derivations / |V|^n at each length (exact)
+    - ambiguity ratio: derivations / |V|^n at each length (exact, cheap)
     - string density: proportion of strings of length n in the language (MC estimate)
+
+    *density_max_length* caps the lengths at which the expensive string_density
+    MC estimate is computed (each sample runs CYK in O(n^3 * |G|)).
+    *time_budget* is a wall-clock limit in seconds for the string density loop;
+    once exceeded, remaining lengths are skipped.
+    Ambiguity ratios are always computed up to *max_length*.
     """
+    import time
+    if density_max_length is None:
+        density_max_length = max_length
     us = UniformSampler(mypcfg, max_length, prng)
+    parser = inside.InsideComputation(mypcfg)
     lengths = []
     ambiguity = []
     string_density = []
+    t_start = time.monotonic()
+    budget_exceeded = False
     for l in range(1, max_length):
         lengths.append(l)
         ambiguity.append(us.density(l))
-        if us.get_total(l) > 0:
+        if not budget_exceeded and l < density_max_length and us.get_total(l) > 0:
             try:
-                sd = us.string_density(l, density_samples)
+                sd = us.string_density(l, density_samples, parser=parser)
             except ValueError:
                 sd = 0.0
+            if time.monotonic() - t_start > time_budget:
+                logging.warning(
+                    "String density time budget (%.0fs) exceeded at length %d; "
+                    "skipping remaining lengths.", time_budget, l)
+                budget_exceeded = True
         else:
             sd = 0.0
         string_density.append(sd)
@@ -199,7 +217,9 @@ def make_report(grammar_file, output_file, args):
         mypcfg, insider_obj, sampler, args.mc_samples)
 
     density_lengths, ambiguity_values, string_density_values = compute_density_data(
-        mypcfg, args.max_length, prng, args.density_samples)
+        mypcfg, args.max_length, prng, args.density_samples,
+        density_max_length=args.density_max_length,
+        time_budget=args.density_time_budget)
 
     lengths, length_probs = compute_length_distribution(mypcfg, args.max_length)
 
@@ -441,6 +461,11 @@ if __name__ == '__main__':
                         help="Maximum string length for exact computations (default 40)")
     parser.add_argument("--density_samples", type=int, default=100,
                         help="Samples per length for string density estimate (default 100)")
+    parser.add_argument("--density_max_length", type=int, default=20,
+                        help="Max string length for string density MC estimate (default 20). "
+                             "Each sample runs CYK in O(n^3), so large values are slow.")
+    parser.add_argument("--density_time_budget", type=float, default=30.0,
+                        help="Wall-clock time budget in seconds for string density (default 30)")
     parser.add_argument("--verbose", action="store_true")
 
     args = parser.parse_args()
