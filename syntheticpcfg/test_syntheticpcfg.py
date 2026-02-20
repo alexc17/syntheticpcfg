@@ -367,6 +367,76 @@ class TestCFG:
 
 
 # =============================================================================
+# Tests for CFGFactory bottom-up deterministic sampling
+# =============================================================================
+
+class TestCFGFactoryBottomUpDeterministic:
+    """Tests for CFGFactory.sample_raw_bottom_up_deterministic."""
+
+    def test_raw_is_bottom_up_deterministic(self):
+        """The raw CFG should have unique RHS pairs across all binary rules."""
+        from .cfgfactory import CFGFactory
+        numpy.random.seed(42)
+        factory = CFGFactory()
+        factory.number_nonterminals = 5
+        factory.number_terminals = 20
+        factory.binary_rules = 10
+        factory.lexical_rules = 20
+        my_cfg = factory.sample_raw_bottom_up_deterministic()
+        rhs_pairs = [(p[1], p[2]) for p in my_cfg.productions if len(p) == 3]
+        assert len(rhs_pairs) == len(set(rhs_pairs))
+
+    def test_correct_number_of_binary_rules(self):
+        """Should produce exactly the requested number of binary rules."""
+        from .cfgfactory import CFGFactory
+        numpy.random.seed(7)
+        factory = CFGFactory()
+        factory.number_nonterminals = 6
+        factory.number_terminals = 10
+        factory.binary_rules = 15
+        factory.lexical_rules = 10
+        my_cfg = factory.sample_raw_bottom_up_deterministic()
+        n_binary = len([p for p in my_cfg.productions if len(p) == 3])
+        assert n_binary == 15
+
+    def test_too_many_binary_rules_raises(self):
+        """Requesting more binary rules than possible RHS pairs should raise."""
+        from .cfgfactory import CFGFactory
+        factory = CFGFactory()
+        factory.number_nonterminals = 3  # 2 RHS nonterminals -> 4 pairs max
+        factory.binary_rules = 5
+        with pytest.raises(ValueError, match="only 4 distinct"):
+            factory.sample_raw_bottom_up_deterministic()
+
+    def test_max_binary_rules(self):
+        """Requesting exactly the max number of binary rules should work."""
+        from .cfgfactory import CFGFactory
+        numpy.random.seed(99)
+        factory = CFGFactory()
+        factory.number_nonterminals = 3  # 4 RHS pairs
+        factory.number_terminals = 5
+        factory.binary_rules = 4
+        factory.lexical_rules = 5
+        my_cfg = factory.sample_raw_bottom_up_deterministic()
+        rhs_pairs = [(p[1], p[2]) for p in my_cfg.productions if len(p) == 3]
+        assert len(rhs_pairs) == len(set(rhs_pairs)) == 4
+
+    def test_trim_preserves_determinism(self):
+        """Trimming should not break bottom-up determinism."""
+        from .cfgfactory import CFGFactory
+        from .pcfgfactory import PCFGFactory
+        numpy.random.seed(42)
+        factory = CFGFactory()
+        factory.number_nonterminals = 5
+        factory.number_terminals = 50
+        factory.binary_rules = 10
+        factory.lexical_rules = 50
+        tcfg = factory.sample_trim_bottom_up_deterministic()
+        rhs_pairs = [(p[1], p[2]) for p in tcfg.productions if len(p) == 3]
+        assert len(rhs_pairs) == len(set(rhs_pairs))
+
+
+# =============================================================================
 # Tests for pcfg.py - PCFG class
 # =============================================================================
 
@@ -1830,6 +1900,66 @@ class TestAmbiguity:
         la = simple_pcfg.compute_lexical_ambiguity()
         assert la >= 0.0
         assert np.isfinite(la)
+
+
+# =============================================================================
+# Tests for bottom-up determinism
+# =============================================================================
+
+class TestBottomUpDeterministic:
+    """Tests for PCFG.is_bottom_up_deterministic."""
+
+    def test_simple_grammar_is_deterministic(self, simple_pcfg):
+        """S -> A B is the only binary rule, so trivially BU-deterministic."""
+        assert simple_pcfg.is_bottom_up_deterministic()
+
+    def test_ambiguous_grammar_not_deterministic(self, ambiguous_pcfg):
+        """S -> S S has only one LHS, so it IS BU-deterministic (only one rule
+        with RHS (S,S))."""
+        assert ambiguous_pcfg.is_bottom_up_deterministic()
+
+    def test_two_rules_same_rhs(self):
+        """Two different nonterminals rewriting to the same RHS pair."""
+        g = pcfg.PCFG()
+        g.start = "S"
+        g.nonterminals = {"S", "A", "B"}
+        g.terminals = {"a", "b"}
+        g.productions = [
+            ("S", "A", "B"),
+            ("A", "A", "B"),  # same RHS as S -> A B
+            ("A", "a"),
+            ("B", "b"),
+        ]
+        g.parameters = {p: 0.5 for p in g.productions}
+        g.normalise()
+        assert not g.is_bottom_up_deterministic()
+
+    def test_different_rhs_order_is_deterministic(self):
+        """A -> B C and S -> C B have different RHS (order matters)."""
+        g = pcfg.PCFG()
+        g.start = "S"
+        g.nonterminals = {"S", "A", "B", "C"}
+        g.terminals = {"x"}
+        g.productions = [
+            ("S", "C", "B"),
+            ("A", "B", "C"),
+            ("B", "x"),
+            ("C", "x"),
+        ]
+        g.parameters = {p: 1.0 for p in g.productions}
+        g.normalise()
+        assert g.is_bottom_up_deterministic()
+
+    def test_lexical_only_grammar(self):
+        """A grammar with no binary productions is trivially BU-deterministic."""
+        g = pcfg.PCFG()
+        g.start = "S"
+        g.nonterminals = {"S"}
+        g.terminals = {"a"}
+        g.productions = [("S", "a")]
+        g.parameters = {("S", "a"): 1.0}
+        g.set_log_parameters()
+        assert g.is_bottom_up_deterministic()
 
 
 # =============================================================================

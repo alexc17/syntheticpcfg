@@ -491,12 +491,16 @@ class PCFGFactory:
         result.renormalise()
         return result
 
-    def sample(self, ignore_errors=False, viterbi=False):
+    def sample(self, ignore_errors=False, viterbi=False,
+               bottom_up_deterministic=False):
         """
         return a PCFG that is well behaved.
         This may not generate strings of all lengths.
         """
-        cfg = self.cfgfactory.sample_trim()
+        if bottom_up_deterministic:
+            cfg = self.cfgfactory.sample_trim_bottom_up_deterministic()
+        else:
+            cfg = self.cfgfactory.sample_trim()
         ##
         unary = "_unary_"
         # make the

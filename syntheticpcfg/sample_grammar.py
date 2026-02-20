@@ -35,6 +35,7 @@ parser.add_argument("--wsjlength", help="Use distribution of lengths from corpus
 parser.add_argument("--poisson", type=float, default=5.0, help="Use Zero truncated poisson.")
 
 parser.add_argument("--nonstrictcnf", help="Allow start symbol to occur on right hand side of production.", action="store_true")
+parser.add_argument("--bottom_up_deterministic", help="Generate bottom-up deterministic grammars (unique RHS for each binary production).", action="store_true")
 
 parser.add_argument("--corpuslength", help="Use distribution of lengths from a chosen corpus. Filename of corpus.")
 parser.add_argument("--verbose",help="Print useful information",action="store_true")
@@ -68,7 +69,15 @@ pcfgfactory.TERMINATION_KLD = args.length_em_termination_kld
 
 nts = args.nonterminals
 
-if args.binaryproductions >  0.5 * nts * nts * nts:
+if args.bottom_up_deterministic:
+	rhs_nts = nts - 1 if not args.nonstrictcnf else nts
+	max_binary = rhs_nts * rhs_nts
+	if args.binaryproductions > max_binary:
+		raise ValueError(
+			"Requested %d binary productions but bottom-up deterministic "
+			"grammars allow at most %d (with %d RHS nonterminals)."
+			% (args.binaryproductions, max_binary, rhs_nts))
+elif args.binaryproductions > 0.5 * nts * nts * nts:
 	raise ValueError("High number of binary rules.")
 
 if args.binaryproductions < nts:
@@ -89,6 +98,9 @@ header.append( "Nonterminals %d terminals %d binary_rules %d lexical_rules % d" 
 if args.nonstrictcnf:
 	factory.cfgfactory.strict_cnf = False
 	header.append("S allowed on RHS of productions.")
+
+if args.bottom_up_deterministic:
+	header.append("Bottom-up deterministic (unique RHS for binary productions).")
 
 if args.pitmanyor:
 	factory.lexical_distribution = pcfgfactory.StickBreakingPrior(a=args.pitmanyora,b=args.pitmanyorb)
@@ -123,7 +135,7 @@ if args.numbergrammars > 1:
 n = 0
 while n < args.numbergrammars:
 	try:
-		pcfg = factory.sample()
+		pcfg = factory.sample(bottom_up_deterministic=args.bottom_up_deterministic)
 		n += 1
 		#header.extend(pcfg.useful_information())
 		if args.numbergrammars > 1:

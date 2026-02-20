@@ -371,6 +371,21 @@ class PCFG:
                 ratio += math.exp(lpd - lps)
         return ( same/n, ratio/n)
 
+    def is_bottom_up_deterministic(self):
+        """
+        A grammar is bottom-up deterministic if no two binary productions
+        share the same right-hand side, i.e. for every pair (B, C) there is
+        at most one nonterminal A with a production A -> B C.
+        """
+        seen_rhs = set()
+        for prod in self.productions:
+            if len(prod) == 3:
+                rhs = (prod[1], prod[2])
+                if rhs in seen_rhs:
+                    return False
+                seen_rhs.add(rhs)
+        return True
+
     def partition_nonterminals(self):
         """
         Partition the sets of nonterminals into sets of mutually recursive nonterminals.

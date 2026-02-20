@@ -100,6 +100,80 @@ class CFGFactory:
 
 
 
+    def sample_raw_bottom_up_deterministic(self):
+        """
+        Return a randomly sampled CFG that is bottom-up deterministic:
+        no two binary productions share the same right-hand side.
+
+        RHS pairs are selected first (uniformly without replacement),
+        then each is assigned a random LHS nonterminal.
+        """
+        lexicon = list(utility.generate_lexicon(self.number_terminals))
+        lexicon.sort()
+        nonterminals = self.generate_nonterminals()
+        rhs_nonterminals = nonterminals[1:] if self.strict_cnf else nonterminals
+        max_binary = len(rhs_nonterminals) ** 2
+        if self.binary_rules > max_binary:
+            raise ValueError(
+                "Requested %d binary productions but only %d distinct "
+                "RHS pairs are possible with %d RHS nonterminals"
+                % (self.binary_rules, max_binary, len(rhs_nonterminals)))
+
+        all_rhs = [(b, c) for b in rhs_nonterminals for c in rhs_nonterminals]
+        chosen_indices = numpy.random.choice(
+            len(all_rhs), size=self.binary_rules, replace=False)
+        bprods = set()
+        for idx in chosen_indices:
+            b, c = all_rhs[idx]
+            a = nonterminals[numpy.random.choice(len(nonterminals))]
+            bprods.add((a, b, c))
+
+        lprods = set()
+        lexicon_size = len(lexicon)
+        while len(lprods) < self.lexical_rules:
+            lhs = numpy.random.choice(nonterminals)
+            rhs = lexicon[numpy.random.choice(range(lexicon_size))]
+            lprods.add((lhs, rhs))
+
+        my_cfg = cfg.CFG()
+        my_cfg.start = nonterminals[0]
+        my_cfg.nonterminals = set(nonterminals)
+        my_cfg.terminals = set(lexicon)
+        my_cfg.productions = lprods | bprods
+        return my_cfg
+
+    def sample_trim_bottom_up_deterministic(self):
+        """
+        Sample a bottom-up deterministic CFG and trim it.
+        Raises ValueError if the resulting language is empty.
+        """
+        my_cfg = self.sample_raw_bottom_up_deterministic()
+        logging.info(
+            "BU-det CFG nominally has %d nonterminals, %d terminals, "
+            "%d binary_rules and %d lexical rules",
+            self.number_nonterminals, self.number_terminals,
+            self.binary_rules, self.lexical_rules)
+        ts = my_cfg.compute_trim_set()
+        if len(ts) == 0:
+            raise ValueError("Empty language")
+        prods = my_cfg.compute_usable_productions(ts)
+        terminals = set()
+        for prod in prods:
+            if len(prod) == 2:
+                terminals.add(prod[1])
+        tcfg = cfg.CFG()
+        tcfg.start = my_cfg.start
+        tcfg.terminals = terminals
+        tcfg.nonterminals = ts
+        tcfg.productions = set(prods)
+        logging.info(
+            "Final BU-det CFG has %d nonterminals, %d terminals, "
+            "%d binary_rules and %d lexical rules",
+            len(tcfg.nonterminals), len(tcfg.terminals),
+            len([p for p in tcfg.productions if len(p) == 3]),
+            len([p for p in tcfg.productions if len(p) == 2]))
+        return tcfg
+
     def sample_raw(self):
         """
         Return a randomly sampled CFG.
