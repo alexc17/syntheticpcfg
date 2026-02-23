@@ -42,6 +42,7 @@ class PCFG:
             self.productions = []
         self.parameters = {}
         self.log_parameters = {}
+        self.header = []
     
 
     def make_unary(self):
@@ -72,16 +73,24 @@ class PCFG:
         upcfg.set_log_parameters()
         return upcfg
 
-    def store(self, filename,header=[]):
+    def store(self, filename,header=None):
         """
         Store this to a file.
+
+        If header is given, use it; otherwise use self.header.
+        Header lines are written as comments (prefixed with #).
         """
         self.productions.sort()
         os.makedirs(os.path.dirname(os.path.abspath(filename)), exist_ok=True)
+        if header is None:
+            header = self.header
         with open(filename,'w') as fhandle:
             if len(header) > 0:
                 for line in header:
-                    fhandle.write('#' + line + "\n")
+                    if line.startswith('#'):
+                        fhandle.write(line + "\n")
+                    else:
+                        fhandle.write('#' + line + "\n")
             for prod in self.productions:
                 p = self.parameters[prod]
                 if len(prod) == 2:    
@@ -134,6 +143,7 @@ class PCFG:
         copypcfg.productions = list(self.productions)
         copypcfg.parameters = dict(self.parameters)
         copypcfg.log_parameters = dict(self.log_parameters)
+        copypcfg.header = list(self.header)
         return copypcfg
 
     def trim_zeros(self, threshold = 0.0):
@@ -749,10 +759,12 @@ def load_pcfg_from_file(filename, normalise=True, discard_zero=True):
     ## Nonterminals are things that appear on the lhs of a production.
     ## Start symbol is S
     ## Um thats it ?
+    header = []
     prods = []
     with open(filename) as infile:
         for line in infile:
             if line.startswith("#"):
+                header.append(line.rstrip('\n'))
                 continue
             tks = line.split()
             if len(tks) == 0:
@@ -791,6 +803,7 @@ def load_pcfg_from_file(filename, normalise=True, discard_zero=True):
     my_pcfg.start =  START_SYMBOL
     my_pcfg.terminals = terminals
     my_pcfg.nonterminals = nonterminals
+    my_pcfg.header = header
     return my_pcfg
 
 

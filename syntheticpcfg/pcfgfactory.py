@@ -285,7 +285,7 @@ class FullPCFGFactory:
                 logging.info("Converged enough.  %f < %f ",  kld , TERMINATION_KLD)
                 break
         else:
-            logging.warning("Reached maximum number of iterations without reaching convergence threshold. Final KLD is %f.",kld)
+            logging.warning("Length distribution: Reached maximum number of iterations without reaching convergence threshold. Final KLD is %f.",kld)
 
 
         unary_pcfg.parameters = ui.get_params()
