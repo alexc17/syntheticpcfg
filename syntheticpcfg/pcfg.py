@@ -3,6 +3,7 @@
 
 import logging
 import math
+import os
 import numpy as np
 import numpy.linalg
 import numpy.random
@@ -76,6 +77,7 @@ class PCFG:
         Store this to a file.
         """
         self.productions.sort()
+        os.makedirs(os.path.dirname(os.path.abspath(filename)), exist_ok=True)
         with open(filename,'w') as fhandle:
             if len(header) > 0:
                 for line in header:
@@ -90,9 +92,10 @@ class PCFG:
     def store_mjio(self, filename):
         """
         Store this in a format suitable for use by MJ IO code.
-        So introduce preterminals for all nonterminals. 
+        So introduce preterminals for all nonterminals.
         Assume in CNF.
         """
+        os.makedirs(os.path.dirname(os.path.abspath(filename)), exist_ok=True)
         with open(filename,'w') as fhandle:
             fhandle.write("1.0 S1 --> S \n")
             preterminals = { nt : ("PRE" + nt) for nt in self.nonterminals}
